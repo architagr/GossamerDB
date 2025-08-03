@@ -10,8 +10,8 @@ type SpreadStrategy interface {
 }
 
 type GossipStrategy interface {
-	GenerateMessage(state map[string]bool) model.GossipMessage
-	Merge(local map[string]bool, incoming model.GossipMessage) map[string]bool
+	GenerateMessage(state model.NodeHealthInfo) model.GossipMessage
+	Merge(local model.NodeHealthInfo, incoming model.GossipMessage) model.NodeHealthInfo
 }
 
 // --- Spread Strategies ---

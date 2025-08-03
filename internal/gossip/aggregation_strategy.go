@@ -9,25 +9,24 @@ import (
 
 type AggregationStrategy struct{}
 
-func (a *AggregationStrategy) GenerateMessage(state map[string]bool) model.GossipMessage {
-	healthy := false
-	for _, ok := range state {
-		if ok {
-			healthy = true
+func (a *AggregationStrategy) GenerateMessage(state model.NodeHealthInfo) model.GossipMessage {
+	healthy := time.Now()
+	for _, val := range state {
+		if !val.IsZero() {
+			healthy = val
 			break
 		}
 	}
-	summary := map[string]bool{"healthy": healthy}
+	summary := model.NodeHealthInfo{"healthy": healthy}
 	log.Printf("[STRATEGY] Aggregation sending summary gossip: %v", summary)
 	return model.GossipMessage{
 		SenderID:   config.SelfID,
 		Timestamp:  time.Now(),
 		NodeHealth: summary,
-		// Config:     *config.CurrentConfig,
 	}
 }
 
-func (a *AggregationStrategy) Merge(local map[string]bool, incoming model.GossipMessage) map[string]bool {
+func (a *AggregationStrategy) Merge(local model.NodeHealthInfo, incoming model.GossipMessage) model.NodeHealthInfo {
 	// Could implement some aggregation logic; here just return local state
 	return local
 }

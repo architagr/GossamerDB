@@ -2,6 +2,7 @@ package gossip
 
 import (
 	"GossamerDB/internal/config"
+	"GossamerDB/pkg/model"
 	"context"
 	"log"
 	"maps"
@@ -10,13 +11,11 @@ import (
 	"time"
 )
 
-var ()
-
 type Engine struct {
 	cfg          config.GossipInfo
 	initiation   GossipStrategy
 	spread       SpreadStrategy
-	nodeHealth   map[string]bool
+	nodeHealth   model.NodeHealthInfo
 	peers        []string
 	nodeHealthMu sync.RWMutex
 	configLock   sync.RWMutex
@@ -31,7 +30,7 @@ func NewEngine(cfg config.GossipInfo) (*Engine, error) {
 		cfg:          cfg,
 		initiation:   initiation,
 		spread:       spread,
-		nodeHealth:   make(map[string]bool),
+		nodeHealth:   make(map[string]time.Time),
 		peers:        make([]string, 0),
 		nodeHealthMu: sync.RWMutex{},
 		configLock:   sync.RWMutex{},
@@ -79,11 +78,11 @@ func (e *Engine) WaitStopped() {
 	<-e.stoppedCh
 }
 
-func (e *Engine) GetNodeHealth() map[string]bool {
+func (e *Engine) GetNodeHealth() model.NodeHealthInfo {
 	e.nodeHealthMu.RLock()
 	defer e.nodeHealthMu.RUnlock()
 
-	copy := make(map[string]bool)
+	copy := make(map[string]time.Time)
 	i := 0
 	for k, v := range e.nodeHealth {
 		copy[k] = v
@@ -95,7 +94,7 @@ func (e *Engine) GetNodeHealth() map[string]bool {
 	return copy
 }
 
-func (e *Engine) UpdateNodeHealth(newHealth map[string]bool) {
+func (e *Engine) UpdateNodeHealth(newHealth model.NodeHealthInfo) {
 	e.nodeHealthMu.Lock()
 	defer e.nodeHealthMu.Unlock()
 	maps.Copy(e.nodeHealth, newHealth)
