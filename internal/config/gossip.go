@@ -1,6 +1,9 @@
 package config
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 type GossipStrategy string
 
@@ -16,7 +19,7 @@ const (
 func (gs GossipStrategy) String() string {
 	return string(gs)
 }
-func (gs *GossipStrategy) Validate() error {
+func (gs *GossipStrategy) validate() error {
 	switch *gs {
 	case GossipStrategyAntiEntropy, GossipStrategyRumorMongering, GossipStrategyAggregation:
 		return nil
@@ -39,7 +42,7 @@ const (
 func (gss GossipSpreadStrategy) String() string {
 	return string(gss)
 }
-func (gss *GossipSpreadStrategy) Validate() error {
+func (gss *GossipSpreadStrategy) validate() error {
 	switch *gss {
 	case GossipSpreadStrategyPull, GossipSpreadStrategyPush, GossipSpreadStrategyPullPush:
 		return nil
@@ -53,5 +56,25 @@ type GossipInfo struct {
 	SpreadStrategy     GossipSpreadStrategy `json:"spreadStrategy" yaml:"spreadStrategy"`         // Strategy for spreading gossip messages
 	Fanout             int                  `json:"fanout" yaml:"fanout"`                         // Number of nodes to which gossip messages are sent
 	IntervalMs         int                  `json:"intervalMs" yaml:"intervalMs"`                 // Interval for gossip message sending in milliseconds
-	BufferSizePerMsg   int                  `json:"bufferSizePerMsg" yaml:"bufferSizePerMsg"`     // Buffer size for each gossip message
+	NodeInfoPerMsg     int                  `json:"nodeInfoPerMsg" yaml:"nodeInfoPerMsg"`         // node info for each gossip message
+	Port               string               `json:"port" yaml:"port"`                             // posr on which we will run the gossip protocol
+}
+
+func (c *GossipInfo) validate() error {
+	if err := c.InitiationStrategy.validate(); err != nil {
+		return err
+	}
+	if err := c.SpreadStrategy.validate(); err != nil {
+		return err
+	}
+	if c.Fanout < 1 {
+		return errors.New("fanout must be positive")
+	}
+	if c.IntervalMs < 100 {
+		return errors.New("IntervalMs must be >= 100ms")
+	}
+	if c.NodeInfoPerMsg < 5 {
+		return errors.New("NodeInfoPerMsg must be >= 5")
+	}
+	return nil
 }

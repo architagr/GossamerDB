@@ -9,6 +9,7 @@ import (
 
 var (
 	configFile = flag.String("config-file-path", "~/code/GossamerDB/config.yaml", "path of the config file")
+	nodeId     = flag.String("node-id", "", "id of the node")
 )
 
 func init() {
@@ -19,6 +20,8 @@ func init() {
 	if err != nil {
 		panic(err) // Handle error appropriately in production code
 	}
+
+	config.InitSelfID(*nodeId)
 }
 
 func main() {

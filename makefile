@@ -21,11 +21,11 @@ run:
 
 run-coordinator:
 	@echo "Running the coordinator..."
-	go run ./cmd/coordinator/main.go --config-file-path=/Users/architagarwal/code/GossamerDB/config.yaml
+	go run ./cmd/coordinator/main.go --config-file-path=/Users/architagarwal/code/GossamerDB/config.yaml --node-id="coodinator-node-1"
 
 run-datanode:
 	@echo "Running the datanode..."
-	go run ./cmd/datanode/main.go --config-file-path=/Users/architagarwal/code/GossamerDB/config.yaml
+	go run ./cmd/datanode/main.go --config-file-path=/Users/architagarwal/code/GossamerDB/config.yaml --node-id="data-node-1"
 
 clean:
 	rm -rf ./build

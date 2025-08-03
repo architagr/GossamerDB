@@ -17,7 +17,7 @@ func (cm ClusterMode) String() string {
 	return string(cm)
 }
 
-func (cm *ClusterMode) Validate() error {
+func (cm *ClusterMode) validate() error {
 	switch *cm {
 	case ClusterModeLocal, ClusterModeK8s, ClusterModeAws:
 		return nil
@@ -34,4 +34,11 @@ type ClusterInfo struct {
 	ReadQuorum        int         `json:"readQuorum" yaml:"readQuorum"`               // Number of nodes required to read data
 	WriteQuorum       int         `json:"writeQuorum" yaml:"writeQuorum"`             // Number of nodes required to write data
 	CoordinatorPort   int         `json:"coordinatorPort" yaml:"coordinatorPort"`     // Port for the coordinator service
+}
+
+func (c *ClusterInfo) validate() error {
+	if err := c.Mode.validate(); err != nil {
+		return err
+	}
+	return nil
 }

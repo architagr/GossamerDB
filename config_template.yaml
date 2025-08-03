@@ -12,7 +12,7 @@ gossip:
   spreadStrategy: "push"  # [push | pull | push-pull]
   fanout: 3
   intervalMs: 1000
-  bufferSizePerMsg: 4096
+  nodeInfoPerMsg: 10
 
 merkleTree:
   bucketSize: 100  # Number of keys per leaf

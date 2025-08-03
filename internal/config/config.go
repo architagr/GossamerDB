@@ -12,6 +12,23 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+var SelfID string
+
+func InitSelfID(configuredID string) {
+	if configuredID != "" {
+		SelfID = configuredID
+		log.Printf("SelfID set from config: %s", SelfID)
+		return
+	}
+	// Default fallback to hostname
+	host, err := os.Hostname()
+	if err != nil {
+		log.Fatalf("Failed to get hostname for SelfID: %v", err)
+	}
+	SelfID = host
+	log.Printf("SelfID set to hostname: %s", SelfID)
+}
+
 // Config holds the configuration settings for the application.
 type Config struct {
 	// Cluster represents the configuration settings for the database cluster,
@@ -92,7 +109,7 @@ func initializeDefaultConfig() *Config {
 			SpreadStrategy:     GossipSpreadStrategyPush,
 			Fanout:             3,
 			IntervalMs:         1000,
-			BufferSizePerMsg:   1024, // Buffer size for each gossip message
+			NodeInfoPerMsg:     10,
 		},
 		MerkleTree: MerkleTreeInfo{
 			BucketSize: 100,
@@ -126,14 +143,11 @@ func initializeDefaultConfig() *Config {
 
 // Validation for all nested fields
 func (c *Config) Validate() error {
-	if err := c.Cluster.Mode.Validate(); err != nil {
-		return fmt.Errorf("cluster.mode: %w", err)
+	if err := c.Cluster.validate(); err != nil {
+		return fmt.Errorf("cluster: %w", err)
 	}
-	if err := c.Gossip.InitiationStrategy.Validate(); err != nil {
-		return fmt.Errorf("gossip.initiationStrategy: %w", err)
-	}
-	if err := c.Gossip.SpreadStrategy.Validate(); err != nil {
-		return fmt.Errorf("gossip.spreadStrategy: %w", err)
+	if err := c.Gossip.validate(); err != nil {
+		return fmt.Errorf("gossip: %w", err)
 	}
 	if err := c.VectorClock.ConflictResolution.Validate(); err != nil {
 		return fmt.Errorf("vectorClock.conflictResolution: %w", err)
