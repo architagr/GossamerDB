@@ -1,0 +1,42 @@
+cluster:
+  mode: "local"  # [local | k8s | aws]
+  virtualNode: 3
+  maxNodesPerRegion: 5
+  totalReplicas: 3
+  readQuorum: 2
+  writeQuorum: 2
+  coordinatorPort: 8080
+
+gossip:
+  initiationStrategy: "anti-entropy"  # [anti-entropy | rumor-mongering | aggregation]
+  spreadStrategy: "push"  # [push | pull | push-pull]
+  fanout: 3
+  intervalMs: 1000
+  bufferSizePerMsg: 4096
+
+merkleTree:
+  bucketSize: 100  # Number of keys per leaf
+
+vectorClock:
+  conflictResolution: "last-write-wins"  # [last-write-wins | merge]
+  maxVersionsPerKey: 10
+
+persistence:
+  enabled: true
+  backend: "localdisk"  # pluggable, [localdisk | aws-ebs | k8s-pvc]
+  path: "/var/lib/kvstore"
+
+security:
+  mtls:
+    enabled: true
+    certFile: "/etc/ssl/cert.pem"
+    keyFile: "/etc/ssl/key.pem"
+    caCert: "/etc/ssl/ca.pem"
+
+monitoring:
+  enabled: true
+  minLogLevel: "info"
+
+repair:
+  enabled: true
+  antiEntropyIntervalInSeconds: 1800  # seconds

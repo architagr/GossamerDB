@@ -1,2 +1,3 @@
-# distributed-kv-store
-distributed kv store
+# GossamerDB
+
+GossamerDB is a cutting-edge, distributed key-value store engineered for the modern cloud and edge landscape. It combines a lightweight yet resilient gossip protocol, Merkle tree–based anti-entropy repair, pluggable conflict resolution with vector clocks, and tunable quorum semantics to deliver strong consistency, rapid convergence, and automatic cloud-native scaling across deployment modes (local, Kubernetes, or multi-region AWS). Its modular design allows operators to adapt gossip and conflict strategies at the cluster level, with robust security, mTLS by default, and built-in hooks for observability and rolling upgrades—all orchestrated through an intelligent coordinator node optimized for high-availability and seamless cluster management.
