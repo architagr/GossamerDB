@@ -40,5 +40,15 @@ func (c *ClusterInfo) validate() error {
 	if err := c.Mode.validate(); err != nil {
 		return err
 	}
+	if c.ReadQuorum < 1 || c.WriteQuorum < 1 || c.TotalReplicas < 1 {
+		return fmt.Errorf("all quorums must be >= 1")
+	}
+	if c.ReadQuorum+c.WriteQuorum <= c.TotalReplicas {
+		return fmt.Errorf("invalid: R + W must be > N for strong consistency (R:%d + W:%d <= N:%d)", c.ReadQuorum, c.WriteQuorum, c.TotalReplicas)
+	}
+	if c.WriteQuorum > c.TotalReplicas || c.ReadQuorum > c.TotalReplicas {
+		return fmt.Errorf("quorum cannot exceed total replicas")
+	}
+
 	return nil
 }
