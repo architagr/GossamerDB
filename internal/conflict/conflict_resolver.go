@@ -1,7 +1,7 @@
 package conflict
 
 import (
-	"log"
+	"GossamerDB/internal/config"
 	"sort"
 )
 
@@ -10,11 +10,16 @@ type ConflictResolver interface {
 	Name() string
 }
 
-func resolveConflicts(resolver ConflictResolver, versions []VersionedValue) []VersionedValue {
-	resolved := resolver.Resolve(versions)
-	log.Printf("Conflict resolved with strategy %s: %d versions remain", resolver.Name(), len(resolved))
-	return resolved
+func InitResolver(max int) ConflictResolver {
+	switch config.ConfigObj.VectorClock.ConflictResolution {
+	case config.VectorClockConflictResolutionLastWriteWins:
+		return NewLwwResolver(max)
+	case config.VectorClockConflictResolutionCustom:
+		return NewMergeResolver(max)
+	}
+	return NewLwwResolver(max)
 }
+
 func PruneVersions(versions []VersionedValue, max int) []VersionedValue {
 	if max < 1 || len(versions) <= max {
 		return versions

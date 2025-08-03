@@ -11,6 +11,10 @@ import (
 // VectorClock tracks causality between distributed events for conflict resolution.
 type VectorClock map[string]int
 
+func NewVectorClock() *VectorClock {
+	return &VectorClock{}
+}
+
 // Copy creates a deep copy of the VectorClock.
 // Useful to avoid unintended modifications when passing clocks.
 func (vc VectorClock) Copy() VectorClock {

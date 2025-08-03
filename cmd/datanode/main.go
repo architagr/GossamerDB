@@ -3,6 +3,7 @@ package main
 import (
 	"GossamerDB/internal/config"
 	"GossamerDB/internal/gossip"
+	"GossamerDB/internal/security"
 	"context"
 	"flag"
 	"fmt"
@@ -35,6 +36,10 @@ func main() {
 
 	startDataNode()
 	runGossip(ctx)
+	_, err := security.LoadMTLSConfig()
+	if err != nil {
+		panic(err)
+	}
 }
 
 func runGossip(ctx context.Context) {

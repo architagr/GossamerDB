@@ -6,6 +6,9 @@ import "GossamerDB/internal/config"
 type Quorum struct {
 }
 
+func New() *Quorum {
+	return &Quorum{}
+}
 func (q *Quorum) RequiredReadAcks() int  { return config.ConfigObj.Cluster.ReadQuorum }
 func (q *Quorum) RequiredWriteAcks() int { return config.ConfigObj.Cluster.WriteQuorum }
 func (q *Quorum) TotalReplicas() int     { return config.ConfigObj.Cluster.TotalReplicas }

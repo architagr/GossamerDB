@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sync"
 
+	"GossamerDB/internal/security"
 	"GossamerDB/pkg/model"
 
 	"github.com/gin-gonic/gin"
@@ -24,10 +25,7 @@ func NewServer(listenAddress string, engine *Engine) *Server {
 		engine: engine,
 	}
 	s.setupRoutes()
-	s.srv = &http.Server{
-		Addr:    listenAddress,
-		Handler: s.router,
-	}
+	s.srv, _ = security.ConfigureSecureServer(listenAddress, s.router)
 	return s
 }
 

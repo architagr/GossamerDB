@@ -2,9 +2,9 @@ package main
 
 import (
 	"GossamerDB/internal/config"
+	"GossamerDB/internal/security"
 	"flag"
 	"fmt"
-	"time"
 )
 
 var (
@@ -22,14 +22,17 @@ func init() {
 	}
 
 	config.InitSelfID(*nodeId)
+
 }
 
 func main() {
 	// This is the entry point for the coordinator service.
 	// The main function will initialize and start the coordinator.
-	time.Sleep(1 * time.Minute)
 	startCoordinator()
-
+	_, err := security.LoadMTLSConfig()
+	if err != nil {
+		panic(err)
+	}
 }
 func startCoordinator() {
 	// Initialization and startup logic for the coordinator goes here.
