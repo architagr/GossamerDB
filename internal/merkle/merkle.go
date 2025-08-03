@@ -43,10 +43,7 @@ func (t *Tree) Build(sortedKeys []string, kvs map[string][]byte) {
 func (t *Tree) buildLeaves(keys []string, kvs map[string][]byte) []*MerkleNode {
 	var leaves []*MerkleNode
 	for i := 0; i < len(keys); i += t.BucketSize {
-		end := i + t.BucketSize
-		if end > len(keys) {
-			end = len(keys)
-		}
+		end := min(i+t.BucketSize, len(keys))
 		bucket := keys[i:end]
 		data := ""
 		for _, k := range bucket {

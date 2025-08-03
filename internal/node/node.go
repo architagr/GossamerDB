@@ -46,7 +46,7 @@ func (n *DataNode) Delete(key string) error {
 	if err != nil {
 		return err
 	}
-	n.rebuildMerkleTree()
+	n.rebuildMerkleTree() // optamize this to reduce latency of delete
 	return nil
 }
 
@@ -61,7 +61,7 @@ func (n *DataNode) Put(key string, value []byte) error {
 		Value: value,
 		Clock: n.vectorClock.Copy(),
 	}
-	n.rebuildMerkleTree()
+	n.rebuildMerkleTree() // optamize this to reduce latency of put
 	return n.store.Set(key, vv)
 }
 
