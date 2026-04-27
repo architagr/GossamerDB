@@ -20,7 +20,8 @@ profile.cov
 # Dependency directories (remove the comment below to include it)
 vendor/
 build/
-
+.claude
+CLAUDE.md
 # Go workspace file
 go.work
 go.work.sum
