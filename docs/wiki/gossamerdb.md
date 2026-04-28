@@ -1,11 +1,11 @@
-# GossamerDB — Business Analyst Wiki
+# GossamerDB — Requirements Wiki
 
-**Owner:** `agent-ba` (Business Analyst)
-**Status:** Draft v0.1 — first pass from the README one-paragraph product brief
-**Next consumer:** `agent-delivery-manager` (will turn this into a PRD at `docs/prds/gossamerdb.md`)
-**Source of intent:** `<projectDIR>/GossamerDB/README.md` (single paragraph; no other product brief exists yet)
+**Author:** Archit Agarwal
+**Status:** Draft v0.1 — first pass from the original one-paragraph product brief
+**Source of intent:** the original product brief (one paragraph; the rest is derived below)
+**Next document:** the PRD at `docs/prds/gossamerdb.md` (already drafted)
 
-> ⚠️ This wiki is intentionally written _only_ from the README. Anything not stated in the README is captured below as an **assumption** or an **open question** and must be resolved by the Delivery Manager (or escalated back to the BA) before the PRD is finalized. The BA has not yet had a clarification round with the user; the Delivery Manager is expected to drive that next.
+> ⚠️ This wiki is intentionally written _only_ from the original brief. Anything not stated there is captured below as an **assumption** or an **open question** to be resolved before the PRD is finalised. The PRD picks up these items in its §11 resolution table.
 
 ---
 
@@ -36,7 +36,7 @@ GossamerDB exists to close that gap: a distributed KV store that combines a ligh
 
 - **NG1.** GossamerDB is **not** a SQL database, document store, full-text search engine, or message broker. The README scopes it to a key-value store.
 - **NG2.** GossamerDB is **not** a multi-tenant SaaS service in v1; it is a system operators deploy into their own infrastructure.
-- **NG3.** No client SDKs in arbitrary languages are promised by the README; SDK scope is an **open question** for the Delivery Manager.
+- **NG3.** No client SDKs in arbitrary languages are promised by the original brief; SDK scope is an **open question** to be resolved in the PRD.
 - **NG4.** No managed control plane (hosted offering) is implied; deployment is operator-driven.
 - **NG5.** Cross-store federation (e.g., bridging to S3, DynamoDB, etcd) is out of scope.
 
@@ -44,7 +44,7 @@ GossamerDB exists to close that gap: a distributed KV store that combines a ligh
 
 ## 3. Actors / Personas
 
-The README implies three classes of stakeholders. None of them are named in the README — these are the BA's inferences and **must be confirmed** by the Delivery Manager.
+The original brief implies three classes of stakeholders. None of them are named there — these are my inferences and **must be confirmed** before the PRD locks them in.
 
 ### 3.1 Cluster Operator ("Olivia") — primary persona
 
@@ -74,7 +74,7 @@ The README implies three classes of stakeholders. None of them are named in the 
 
 ## 4. Primary User Flows
 
-Each flow below states **trigger → what the system does → success signal**. None of these flows is yet validated against the user's intent — they are derived from the README plus the existing `internal/` package layout. The Delivery Manager should confirm each flow's "happy path" before turning them into PRD acceptance criteria.
+Each flow below states **trigger → what the system does → success signal**. These flows are derived from the original brief plus the existing `internal/` package layout. The PRD turns each "happy path" into testable acceptance criteria.
 
 ### 4.1 Cluster bring-up
 
@@ -134,7 +134,7 @@ Each flow below states **trigger → what the system does → success signal**. 
 
 ## 5. Functional Requirements (high-level)
 
-The following are stated using the IETF MUST / SHOULD / COULD convention. They are **high-level**; the Delivery Manager will decompose them into PRD-level acceptance criteria.
+The following are stated using the IETF MUST / SHOULD / COULD convention. They are **high-level**; the PRD decomposes them into PRD-level acceptance criteria.
 
 ### 5.1 MUST
 
@@ -184,7 +184,7 @@ These NFRs are inherited from `CLAUDE.md` and from the README's framing. They mu
 
 ### 6.3 Scale
 
-- **NFR-SCALE-1.** The cluster must scale across multi-region AWS. Concrete numerical targets (nodes per cluster, keys per node, peak QPS, peak payload size) are **all open questions** that the Delivery Manager must extract from the user.
+- **NFR-SCALE-1.** The cluster must scale across multi-region AWS. Concrete numerical targets (nodes per cluster, keys per node, peak QPS, peak payload size) are **all open questions** to be locked in the PRD.
 
 ### 6.4 Security & compliance
 
@@ -220,7 +220,7 @@ These NFRs are inherited from `CLAUDE.md` and from the README's framing. They mu
 - Rolling upgrade machinery.
 - Bench gate compliance per `CLAUDE.md`.
 
-### 7.2 Out of scope (until reopened by the user)
+### 7.2 Out of scope (until reopened)
 
 - SQL / document / search / queue semantics on top of the KV store.
 - Hosted / managed service offering.
@@ -232,7 +232,7 @@ These NFRs are inherited from `CLAUDE.md` and from the README's framing. They mu
 
 ## 8. Stated Assumptions
 
-These are explicit BA assumptions made because the README does not say. Each one is the Delivery Manager's to confirm or revise.
+These are explicit assumptions made because the original brief does not say. Each one is for the PRD to confirm or revise.
 
 - **A1.** "Strong consistency" in the README means _configurable_ strong consistency at the request level, not blanket linearizability across the whole cluster.
 - **A2.** The "intelligent coordinator" is an addressable role (one or more processes), not a metaphor — i.e., it is a real binary with an API surface (the repo confirms this; `cmd/coordinator/` exists).
@@ -247,50 +247,42 @@ These are explicit BA assumptions made because the README does not say. Each one
 
 ---
 
-## 9. Open Questions for the Delivery Manager
+## 9. Open Questions
 
-These are the **must-resolve** items before the PRD can be finalized. Each one was inferred to be missing from the README and is the BA's hand-off list to the Delivery Manager. Any item not resolved here will block the Architect downstream.
+These were the must-resolve items before the PRD could be finalised. Resolved questions are removed from the open list and recorded in the PRD's §11 resolution table; only the still-open ones remain below.
 
-1. **Workload shape & scale targets.** What are the v1 numerical targets? Concretely: peak QPS per cluster, peak QPS per key, p50 / p95 / p99 latency targets for `Get` and `Put` at each consistency level, max value size, max key cardinality, and replication factor defaults.
-2. **Coordinator HA model.** Is the coordinator a leader-elected cluster (Raft? gossip-elected?), an active-active set, or a stateless front-door over a consensus group? What is its failover RTO / RPO?
-3. **Coordinator vs data-node responsibilities.** Does the coordinator sit on the request path for every `Get` / `Put`, or is it strictly a control-plane role that data-nodes hit out-of-band? This decision is load-bearing for the < 1 ms p99 cache-call SLO.
-4. **Quorum semantics & defaults.** What are the supported consistency levels (e.g., `ONE`, `QUORUM`, `ALL`, custom `R`+`W`), what is the default, and is consistency selectable per request, per client, or only per cluster?
-5. **Conflict-resolution strategies — which ones ship in v1?** Last-Write-Wins? CRDT-based? Application-supplied merge function? What is the default? What is the migration story when an operator changes the strategy?
-6. **Gossip strategies — which ones ship in v1?** SWIM? Plumtree? HyParView? Periodic full-state? What is the default, and what are the trade-offs documented to operators?
-7. **Storage backend pluggability.** The repo has `internal/storage`; is the backend pluggable in v1, and if so, which backends ship (in-memory, BoltDB-style, RocksDB, S3-backed, Postgres)? The `CLAUDE.md` tech stack mentions Postgres and Redis — what role do they play (durable storage? cache only? metadata?)?
-8. **mTLS / PKI source of truth.** Operator-supplied PKI? Built-in CA? SPIFFE / SPIRE? Vault-issued certs? What is the expected rotation cadence and operator workflow?
-9. **Authentication & authorization for clients.** Beyond mTLS at the transport layer, is there per-key or per-namespace authorization (RBAC, ACLs, capability tokens)? Or is mTLS identity the only auth surface in v1?
-10. **Compliance posture.** Are SOC2 / GDPR / HIPAA / FedRAMP in scope for v1? Data-residency guarantees in multi-region AWS?
-11. **Multi-region semantics.** Are writes single-region with async cross-region replication, or active-active with vector-clock-merged conflicts? What is the expected cross-region write latency?
-12. **Rolling-upgrade contract.** What is the version-skew window the cluster guarantees? How are gossip / conflict strategy changes versioned?
-13. **Strategy hot-swap.** Is hot-swap of gossip / conflict strategies a v1 promise, or is restart-time swap acceptable? (See flow §4.6.)
-14. **Client surface.** Which languages get a first-class client SDK in v1? Go-only? Go + one other? Or just the wire protocol?
-15. **Edge deployment shape.** The README names "edge landscape" — what does an edge node look like? Is it a full GossamerDB node, a read-through cache, or a thin proxy?
-16. **Observability backends.** Beyond OpenTelemetry-as-a-format, which collectors / dashboards / SLO definitions ship in v1 (Prometheus? Tempo? a reference Grafana dashboard)?
-17. **Disaster recovery & backup.** Is there an explicit snapshot / restore tool, or is anti-entropy + replication considered DR-sufficient?
-18. **Tenancy.** Single-tenant per cluster, or multi-tenant with namespace isolation?
-19. **Public API stability commitment.** What is the versioning policy for the gRPC / REST surface and the strategy extension points?
-20. **Tooling & migration path.** Is there a migration story for users coming from etcd / Consul / Redis / DynamoDB, or is GossamerDB a clean-slate adoption?
+### 9.1 Resolved (closed by the PRD or by direct user input)
 
----
+The following questions are **closed**. See `docs/prds/gossamerdb.md §11` for the binding resolution and the rejected alternatives.
 
-## 10. Hand-off
+- ~~**Workload shape & scale targets.**~~ Resolved 2026-04-28 — see PRD NFR-PERF-1a/1b and NFR-SCALE-1..8.
+- ~~**Coordinator HA model.**~~ Resolved 2026-04-28 — 3-node embedded Raft, control-plane only, RTO < 30 s, RPO 0, 99.95% availability target. See PRD §11 Q2.
+- ~~**Coordinator vs data-node responsibilities (data-plane routing topology).**~~ Resolved 2026-04-28 — Raft Coordinator stays off the per-request path; data-plane routing uses a three-tier preference order (smart Go client SDK → coordinator-as-replica fan-out → any-data-node forwarding fallback). Stateless router tier deferred. See PRD §11 Q3, FR-8, and FR-20.
+- ~~**Quorum semantics & defaults.**~~ Resolved 2026-04-28 — **Option C**: cluster config owns the numerics (`N=5, W=3, R=3` default); per-request consistency is a named enum `{ONE, QUORUM, ALL}` only (default `QUORUM`); arbitrary numeric R/W per request is not allowed at the wire level. See PRD §11 Q4, FR-2, FR-20, J-A-1.
+- ~~**Conflict-resolution strategies.**~~ Resolved 2026-04-29 — Two strategies ship in v1, configurable at the cluster level: **`lww` (default)** and **`siblings`**. Vector clocks are always attached. `lww` resolves concurrent writes by **highest vector clock** under a deterministic total order (LLD locks the exact comparator). `siblings` is **Riak-style**: a `Get` that finds divergent values returns **all sibling values + their vector-clock contexts in a single response**; the client picks/merges and writes back with a clock that descends from all siblings, collapsing them. **Strategy is set at cluster bootstrap and cannot be hot-swapped** (rolling-restart swap only — see Q9 below / PRD Q13). **Application-supplied merge functions are explicitly rejected for v1** — the `siblings` strategy is the supported escape hatch for teams that need application-level merge semantics. README markets `lww` as the default with `siblings` as the operator-selectable alternative for teams that need to surface concurrent writes. See PRD §11 Q5, FR-4, J-A-2.
 
-- **This document:** `<projectDIR>/GossamerDB/docs/wiki/gossamerdb.md`
-- **Next agent:** `agent-delivery-manager`
-- **Expected next artefact:** `docs/prds/gossamerdb.md` — the PRD must (a) drive a clarification round with the user against the open questions in §9, (b) translate the high-level F-\
+### 9.2 Still open
 
-16. **Observability backends.** Beyond OpenTelemetry-as-a-format, which collectors / dashboards / SLO definitions ship in v1 (Prometheus? Tempo? a reference Grafana dashboard)?
-17. **Disaster recovery & backup.** Is there an explicit snapshot / restore tool, or is anti-entropy + replication considered DR-sufficient?
-18. **Tenancy.** Single-tenant per cluster, or multi-tenant with namespace isolation?
-19. **Public API stability commitment.** What is the versioning policy for the gRPC / REST surface and the strategy extension points?
-20. **Tooling & migration path.** Is there a migration story for users coming from etcd / Consul / Redis / DynamoDB, or is GossamerDB a clean-slate adoption?
+1. **Gossip strategies — which ones ship in v1?** SWIM? Plumtree? HyParView? Periodic full-state? What is the default, and what are the trade-offs documented to operators?
+2. **Storage backend pluggability.** The repo has `internal/storage`; is the backend pluggable in v1, and if so, which backends ship (in-memory, BoltDB-style, RocksDB, S3-backed, Postgres)? The `CLAUDE.md` tech stack mentions Postgres and Redis — what role do they play (durable storage? cache only? metadata?)?
+3. **mTLS / PKI source of truth.** Operator-supplied PKI? Built-in CA? SPIFFE / SPIRE? Vault-issued certs? What is the expected rotation cadence and operator workflow?
+4. **Authentication & authorization for clients.** Beyond mTLS at the transport layer, is there per-key or per-namespace authorization (RBAC, ACLs, capability tokens)? Or is mTLS identity the only auth surface in v1?
+5. **Compliance posture.** Are SOC2 / GDPR / HIPAA / FedRAMP in scope for v1? Data-residency guarantees in multi-region AWS?
+6. **Multi-region semantics.** Are writes single-region with async cross-region replication, or active-active with vector-clock-merged conflicts? What is the expected cross-region write latency?
+7. **Rolling-upgrade contract.** What is the version-skew window the cluster guarantees? How are gossip / conflict strategy changes versioned?
+8. **Strategy hot-swap.** Is hot-swap of gossip / conflict strategies a v1 promise, or is restart-time swap acceptable? (See flow §4.6.) _(Conflict-strategy half resolved 2026-04-29: no hot-swap. Gossip half still open.)_
+9. **Client surface.** Which languages get a first-class client SDK in v1? Go-only? Go + one other? Or just the wire protocol?
+10. **Edge deployment shape.** The README names "edge landscape" — what does an edge node look like? Is it a full GossamerDB node, a read-through cache, or a thin proxy?
+11. **Observability backends.** Beyond OpenTelemetry-as-a-format, which collectors / dashboards / SLO definitions ship in v1 (Prometheus? Tempo? a reference Grafana dashboard)?
+12. **Disaster recovery & backup.** Is there an explicit snapshot / restore tool, or is anti-entropy + replication considered DR-sufficient?
+13. **Tenancy.** Single-tenant per cluster, or multi-tenant with namespace isolation?
+14. **Public API stability commitment.** What is the versioning policy for the gRPC / REST surface and the strategy extension points?
+15. **Tooling & migration path.** Is there a migration story for users coming from etcd / Consul / Redis / DynamoDB, or is GossamerDB a clean-slate adoption?
 
 ---
 
 ## 10. Hand-off
 
-- **This document:** `<projectDIR>/GossamerDB/docs/wiki/gossamerdb.md`
-- **Next agent:** `agent-delivery-manager`
-- **Expected next artefact:** `docs/prds/gossamerdb.md` — the PRD must (a) drive a clarification round with the user against the open questions in §9, (b) translate the high-level F-\* requirements in §5 into testable acceptance criteria, and (c) carry the < 1 ms p99 cache-call SLO from `CLAUDE.md` forward as a hard NFR for the Architect.
-- **EM gate reminder:** per `.claude/TEAM_WORKFLOW.md` step 4, the Engineering Manager will only sign off after the Architect's HLD + LLD + Epics + Stories are drafted on top of the PRD; this wiki is the upstream input.
+- **This document:** `docs/wiki/gossamerdb.md`
+- **Next document:** `docs/prds/gossamerdb.md` — the PRD (a) drives a clarification round against the open questions in §9.2, (b) translates the high-level F-\* requirements in §5 into testable acceptance criteria, and (c) carries the < 1 ms p99 cache-call SLO from `CLAUDE.md` forward as a hard NFR for the design phase.
+- **Design sign-off:** the HLD + LLD + Epics + Stories will be drafted on top of the PRD; this wiki is the upstream input that those documents trace back to.
