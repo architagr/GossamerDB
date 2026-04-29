@@ -17,7 +17,7 @@ GossamerDB combines a region-aware SWIM gossip protocol (with an optional Plumtr
 | **Operate the same way on a laptop, a k8s cluster, or 3 AWS regions**   | One binary. Mode is config. No cloud-specific primitives on the request path.                                                         |
 | **Secure by default**                                                   | mTLS on every listener; plaintext is not buildable. Cert rotation online with a 24 h overlap window.                                  |
 | **Resilient cluster ops**                                               | Rolling upgrades with N / N+1 minor-version skew. Node loss healed by Merkle anti-entropy without taking traffic offline.             |
-| **First-class observability**                                           | OpenTelemetry traces, metrics, and logs across the request path, gossip, and anti-entropy. Reference Grafana dashboard ships in v1.   |
+| **First-class observability**                                           | OpenTelemetry traces, metrics, and logs over OTLP, routed through an OTel Collector to Prometheus + Tempo + Loki, viewed in Grafana — full reference stack ships in v1. |
 
 ## Performance commitments (v1.0 GA)
 
@@ -42,7 +42,9 @@ These are the published numbers the bench gate enforces. They are commitments �
 - **In-memory data nodes (v1).** Sharded in-memory KV store; no per-node disk persistence in v1. Cluster-level fault tolerance via `N=5/W=3/R=3` replication + Merkle anti-entropy. Single-node restarts hydrate from peers. Pluggable durable backend (Pebble / RocksDB / S3-tiered) ships in v1.x.
 - **Operator-selected backup destination.** `gossamerctl snapshot` writes point-in-time snapshots to **either S3-compatible object storage or PostgreSQL** — operator picks one at cluster bootstrap. The same destination also stores Coordinator Raft snapshots, so backup is configured once for the whole cluster. Redis is the cross-instance read cache only — never a backend.
 - **Gossip stack.** Region-aware SWIM for membership and failure detection (within-region full fanout, cross-region reduced fanout) with optional Plumtree as a second layer for efficient bulk dissemination of partition-map and strategy-version updates.
-- **Cluster security.** mTLS required end-to-end. Operator-supplied PKI loaded from disk or a Kubernetes Secret.
+- **Single-tenant per cluster (v1).** One cluster = one logical workload. Multi-tenant namespace isolation lands in v1.1 alongside per-namespace authorization; today, run multiple clusters for tenant isolation.
+- **Full observability stack out of the box.** GossamerDB exports OTLP gRPC for metrics, traces, and logs (single wire). A reference deployment under `deploy/observability/` brings up an OpenTelemetry Collector, Prometheus, Tempo, Loki, and Grafana — pre-provisioned datasources and a three-panel cross-correlated dashboard let operators pivot from a slow span to its logs in one click. `docker-compose.yaml` for local dev; Helm sub-chart for k8s.
+- **Cluster security.** mTLS required end-to-end (no `--insecure` flag exists). Operator-supplied PKI via a `pki.Source` interface — ships with `disk` (fsnotify hot-reload) and `k8s-secret` (cert-manager-friendly) sources in v1; SPIFFE / Vault plug in via the same interface in v1.x. Cert reload is online with a 24 h overlap window. SAN-based identity embeds the cluster name (`admin.<cluster>`, `data.<cluster>.<region>`, …) so a cert leak in one cluster cannot drive another.
 - **Rolling upgrades.** N / N+1 minor-version skew supported. Per-key unavailability bounded to < 5 s during the per-node drain window.
 
 ## Quick start
@@ -102,7 +104,7 @@ A single binary set; the deployment mode is selected by configuration, not by se
 
 - **Local.** `gossamer coordinator` + `gossamer datanode` on the same host or LAN. Cluster reaches `Ready` within 60 s.
 - **Kubernetes.** A Helm chart deploys the Coordinator group as a `StatefulSet` (3 replicas) and the data tier as a `StatefulSet` with anti-affinity. Cluster reaches `Ready` within 3 minutes.
-- **Multi-region AWS.** Same binary; one home region per key range with async cross-region replication. Cluster reaches `Ready` within 10 minutes (cold start, image pre-pulled).
+- **Multi-region AWS.** Same binary, with cross-region behaviour as a per-cluster opt-in (`cross_region.mode = none | active_passive`). In `active_passive`, one **primary region** owns writes and N **passive regions** receive async replication (lag p99 < 2 s under ≤ 100 ms inter-region RTT). Passive regions serve `consistency=ONE` reads locally; `QUORUM`/`ALL` reads and all writes are transparently retried by the smart Go SDK against the primary. Failover is operator-gated: `gossamerctl promote --new-primary=<region>` flips the cluster, fences the old primary, and `gossamerctl reseed --from=<region>` brings the demoted region back online. Cluster reaches `Ready` within 10 minutes (cold start, image pre-pulled).
 
 ## Architecture at a glance
 
@@ -123,9 +125,9 @@ The HLD, LLD, Epic breakdown, and per-story implementation plans land under `doc
 
 ## Roadmap
 
-- **v1.0 GA (target).** Single-region core, **in-memory data tier**: KV API, `N=5/W=3/R=3` quorum, region-aware SWIM gossip + optional Plumtree, vector clocks (LWW + siblings), Merkle anti-entropy, mTLS-by-default, embedded-Raft Coordinator, rolling upgrades, OpenTelemetry, snapshot/restore to operator-selected backup destination (S3 or Postgres), smart Go SDK.
-- **v1.1.** **Pluggable durable per-node data backend (Pebble first)** so cluster state survives full-cluster outage without operator-triggered snapshots; strategy hot-swap; per-key / per-namespace authorization (RBAC); one additional non-Go SDK (Java or Python by demand).
-- **v1.2.** Active-active multi-region (`LOCAL_QUORUM`); web admin UI; HyParView peer-sampling overlay under Plumtree at thousand-node scale.
+- **v1.0 GA (target).** Single-region core (with optional **cluster-level active-passive multi-region** via async replication and manual `gossamerctl promote` failover), **in-memory data tier**, **single-tenant per cluster**: KV API, `N=5/W=3/R=3` quorum, region-aware SWIM gossip + optional Plumtree, vector clocks (LWW + siblings), Merkle anti-entropy, mTLS-by-default, embedded-Raft Coordinator, rolling upgrades, full OTel + Prom + Tempo + Loki + Grafana reference observability stack, snapshot/restore to operator-selected backup destination (S3 or Postgres), smart Go SDK.
+- **v1.1.** **Pluggable durable per-node data backend (Pebble first)** so cluster state survives full-cluster outage without operator-triggered snapshots; **multi-tenant namespace isolation** with per-namespace RBAC/ACL; strategy hot-swap; one additional non-Go SDK (Java or Python by demand).
+- **v1.2.** **Active-active multi-region writes + automatic region failover** (both ride the cross-region vector-clock merge machinery); `LOCAL_QUORUM`; web admin UI; HyParView peer-sampling overlay under Plumtree at thousand-node scale.
 - **v1.x.** Additional storage backends (RocksDB, S3-tiered); additional backup destinations; edge read-through cache; SPIFFE / Vault PKI sources; migration importers from etcd / Consul / Redis / DynamoDB.
 
 ## For contributors
