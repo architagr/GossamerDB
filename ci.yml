@@ -1,0 +1,38 @@
+name: CI Pipeline
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build-test-bench:
+    name: Build, Test, and Bench
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21' # Required version based on the README
+          cache: true
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+          args: --timeout=5m
+
+      - name: Run Tests
+        run: go test ./... -v -race
+
+      - name: Make bench script executable
+        run: chmod +x ./scripts/bench-check.sh
+
+      - name: Run Benchmark Gate
+        env:
+          BENCH_THRESHOLD_NS: "5000000" # 5ms hard ceiling
+        run: ./scripts/bench-check.sh
