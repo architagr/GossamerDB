@@ -41,7 +41,7 @@
 - **G7.** Provide an **HA coordinator** (3-node Raft group, embedded — see §6.1) so that a single coordinator failure does not stop the cluster.
 - **G8.** Emit **OpenTelemetry** traces, metrics, and logs covering the request path, gossip, anti-entropy, and security events.
 - **G9.** Support **rolling upgrades** with a one-minor-version skew window, no full-cluster downtime, and a documented rollback path.
-- **G10.** Honor the project-wide **< 1 ms p99 cache-call SLO** from `CLAUDE.md` on every request-scoped read path that flows through the cache layer. Enforced by `./.claude/scripts/bench-check.sh` as a hard gate.
+- **G10.** Honor the project-wide **< 1 ms p99 cache-call SLO** from `CLAUDE.md` on every request-scoped read path that flows through the cache layer. Enforced by `./scripts/bench-check.sh` as a hard gate.
 
 ### 1.2 Non-Goals (v1)
 
@@ -84,7 +84,7 @@ The wiki's three primary personas (Olivia / Adi / Sam) and one tertiary (Contrib
 
 ### 2.4 Contributor (tertiary)
 
-- **J-C-1. New strategy authoring.** A contributor implements a new gossip or conflict strategy by satisfying a small Go interface, adds it to a strategy registry, and selects it via cluster config. The bench gate (`./.claude/scripts/bench-check.sh`) is the contract that proves their strategy does not regress hot-path latency.
+- **J-C-1. New strategy authoring.** A contributor implements a new gossip or conflict strategy by satisfying a small Go interface, adds it to a strategy registry, and selects it via cluster config. The bench gate (`./scripts/bench-check.sh`) is the contract that proves their strategy does not regress hot-path latency.
 
 ---
 
@@ -196,7 +196,7 @@ The project-wide **< 1 ms p99 cache-call SLO** from `CLAUDE.md` is carried forwa
 
 > **GET budget is request-level, not cache-only.** The commitment is **GET p99 < 1 ms regardless of consistency level**, including `R=QUORUM=3`. That tightens this PRD versus prior drafts: every `Get` path — cache hit, cache miss, quorum read — must come in under 1 ms p99 intra-AZ. The cache layer is therefore mandatory on the read path (NFR-PERF-2) and the bench gate now applies to **the full GET request, not just the cache-hit sub-path**. The HLD must show how a `R=3 of 5` quorum read clears 1 ms p99 — likely via parallel replica fan-out, fastest-3-wins, and pre-warmed connection pools. **PUT p99 = 5 ms** is the matching write commitment under `W=3 of 5`.
 
-- **NFR-PERF-1.** Every feature contributes a `*_bench_test.go` file with `b.ReportAllocs()`. The bench gate (`./.claude/scripts/bench-check.sh`) runs in CI and locally before PR ready-for-review.
+- **NFR-PERF-1.** Every feature contributes a `*_bench_test.go` file with `b.ReportAllocs()`. The bench gate (`./scripts/bench-check.sh`) runs in CI and locally before PR ready-for-review.
 - **NFR-PERF-1a. GET request budget (request-level, intra-AZ).** p50 ≤ **100 µs**, p95 ≤ **200 µs**, p99 ≤ **1 ms** at `N=5`, `R=3` (quorum) or `R=1`. The bench gate enforces the 1 ms p99 ceiling on the full GET path, not only the cache-hit sub-path.
 - **NFR-PERF-1b. PUT request budget (request-level, intra-AZ).** p50 ≤ **500 µs**, p95 ≤ **1 ms**, p99 ≤ **5 ms** at `N=5`, `W=3` (quorum). The bench gate ledger tracks PUT separately and fails on regression; PUT p99 is **not** subject to the 1 ms cache-call SLO (it is replication-bound).
 - **NFR-PERF-2.** The cache layer (Redis cross-instance, in-memory LRU / `sync.Map` single-instance) is mandatory for any path subject to the < 1 ms gate. Cache invalidation must be **explicit and tested** (mandatory invalidation test per cache). **Cache key shape and TTL contract (A1):** entries are keyed by `(key, partition_map_epoch)`, default TTL **100 ms**, ceiling **500 ms**, configurable per cluster but never disabled. Both `R=ONE` and `R=QUORUM` results are eligible for cache population; `siblings`-mode divergent results are not cacheable. See §6.3 and FR-12 for the binding contract.
@@ -388,7 +388,7 @@ GA means **all of**:
 
 - All FR-1..FR-16 implemented with PRD-traceable acceptance tests in `internal/.../*_test.go`.
 - All NFR-PERF / NFR-AVAIL / NFR-SCALE / NFR-SEC targets demonstrated by the system-test rig at the documented numbers.
-- `./.claude/scripts/bench-check.sh` green on `develop` for 7 consecutive days at the GA candidate SHA.
+- `./scripts/bench-check.sh` green on `develop` for 7 consecutive days at the GA candidate SHA.
 - `golangci-lint run` clean; `go test ./...` green.
 - A 32-node-cluster, 3-region rolling-upgrade rehearsal completes with **zero** data-plane downtime > 5 s per key.
 - A security review of the mTLS posture, audit-log surface, and cert-rotation procedure is signed off by the security persona's reference reviewer.

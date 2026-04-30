@@ -4,15 +4,15 @@ This directory holds the design package for GossamerDB. Documents below are prod
 
 ## Index
 
-| #   | Document                    | Author          | Path                                       | Status                            |
-| --- | --------------------------- | --------------- | ------------------------------------------ | --------------------------------- |
-| 1   | Wiki (initial requirements) | Archit Agarwal  | [`wiki/gossamerdb.md`](wiki/gossamerdb.md) | Done                              |
-| 2   | PRD (Product Requirements)  | Archit Agarwal  | [`prds/gossamerdb.md`](prds/gossamerdb.md) | Draft v1.4 — awaiting design sign-off |
-| 3   | HLD (High-Level Design)     | Archit Agarwal  | `hld/gossamerdb.md`                        | Pending                           |
-| 4   | LLD (Low-Level Design)      | Archit Agarwal  | `lld/gossamerdb.md`                        | Pending                           |
-| 5   | Epics                       | Archit Agarwal  | `epics/gossamerdb/`                        | Pending                           |
-| 6   | Stories (≤ 300 LOC each)    | Archit Agarwal  | `stories/gossamerdb/<epic>/`               | Pending                           |
-| 7   | Migration plans             | Archit Agarwal  | `migrations/<feature>.md`                  | Created per feature               |
+| #   | Document                    | Author         | Path                                       | Status                                |
+| --- | --------------------------- | -------------- | ------------------------------------------ | ------------------------------------- |
+| 1   | Wiki (initial requirements) | Archit Agarwal | [`wiki/gossamerdb.md`](wiki/gossamerdb.md) | Done                                  |
+| 2   | PRD (Product Requirements)  | Archit Agarwal | [`prds/gossamerdb.md`](prds/gossamerdb.md) | Draft v1.4 — awaiting design sign-off |
+| 3   | HLD (High-Level Design)     | Archit Agarwal | `hld/gossamerdb.md`                        | Pending                               |
+| 4   | LLD (Low-Level Design)      | Archit Agarwal | `lld/gossamerdb.md`                        | Pending                               |
+| 5   | Epics                       | Archit Agarwal | `epics/gossamerdb/`                        | Pending                               |
+| 6   | Stories (≤ 300 LOC each)    | Archit Agarwal | `stories/gossamerdb/<epic>/`               | Pending                               |
+| 7   | Migration plans             | Archit Agarwal | `migrations/<feature>.md`                  | Created per feature                   |
 
 ## Reading order
 
@@ -23,7 +23,7 @@ This directory holds the design package for GossamerDB. Documents below are prod
 
 ## Cross-cutting constraints
 
-- **< 1 ms p99 cache-call SLO** — defined in [`../CLAUDE.md`](../CLAUDE.md) "Performance Gate", enforced by `./.claude/scripts/bench-check.sh`. Every design doc must respect it; every implementation PR must pass it.
+- **< 1 ms p99 cache-call SLO** — defined in `../CLAUDE.md` "Performance Gate", enforced by `./scripts/bench-check.sh`. Every design doc must respect it; every implementation PR must pass it.
 - **Stack** — Go 1.21+, gRPC, Fiber (REST), PostgreSQL, Redis, OpenTelemetry. See `CLAUDE.md` "Project Overview".
 - **Security baseline** — mTLS-by-default on every hop. No `--insecure` flag exists in v1 (PRD FR-6).
 

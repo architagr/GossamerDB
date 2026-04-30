@@ -1,0 +1,13 @@
+# Dependabot configuration for GossamerDB
+version: 2
+updates:
+  # Maintain Go dependencies
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+  # Maintain GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

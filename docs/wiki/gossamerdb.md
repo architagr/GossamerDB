@@ -155,7 +155,7 @@ The following are stated using the IETF MUST / SHOULD / COULD convention. They a
 - **F-SHOULD-2.** Ship at least one **reference gossip strategy** and one **reference conflict-resolution strategy** that work safely out of the box.
 - **F-SHOULD-3.** Provide **structured audit logging** for security-sensitive events (mTLS handshake failures, configuration changes, admin actions).
 - **F-SHOULD-4.** Allow the **storage backend** behind a node to be pluggable (the existing `internal/storage` package implies this; the README itself does not state it explicitly — see open questions).
-- **F-SHOULD-5.** Provide a **bench harness** per feature that satisfies the project's `./.claude/scripts/bench-check.sh` gate.
+- **F-SHOULD-5.** Provide a **bench harness** per feature that satisfies the project's `./scripts/bench-check.sh` gate.
 
 ### 5.3 COULD
 
@@ -172,7 +172,7 @@ These NFRs are inherited from `CLAUDE.md` and from the README's framing. They mu
 
 ### 6.1 Performance
 
-- **NFR-PERF-1.** **< 1 ms p99 cache-call latency** is a project-wide hard SLO, enforced by `./.claude/scripts/bench-check.sh`. Any GossamerDB request path that is served out of cache (Redis cross-instance or in-memory LRU / `sync.Map` single-instance) must meet this budget. Bypassing the gate is not permitted.
+- **NFR-PERF-1.** **< 1 ms p99 cache-call latency** is a project-wide hard SLO, enforced by `./scripts/bench-check.sh`. Any GossamerDB request path that is served out of cache (Redis cross-instance or in-memory LRU / `sync.Map` single-instance) must meet this budget. Bypassing the gate is not permitted.
 - **NFR-PERF-2.** Every feature must ship a `*_bench_test.go` benchmark with `b.ReportAllocs()` enabled, covering the request-scoped path end-to-end with realistic input volumes.
 - **NFR-PERF-3.** Anti-entropy and gossip must be **bounded background work** — they must not pre-empt foreground request budgets.
 

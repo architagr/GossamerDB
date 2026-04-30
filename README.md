@@ -10,27 +10,27 @@ GossamerDB combines a region-aware SWIM gossip protocol (with an optional Plumtr
 
 ## Why GossamerDB
 
-| If you need...                                                          | GossamerDB gives you                                                                                                                  |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| **Sub-millisecond reads at the request level** under quorum consistency | GET p99 < 1 ms with `N=5, R=3` via parallel fastest-of-5 fan-out and a mandatory cache layer.                                         |
-| **Tunable consistency without the footgun**                             | Per-request named levels — `ONE`, `QUORUM`, `ALL` — that map to operator-controlled numerics. No raw `R=1` calls on the billing path. |
-| **Operate the same way on a laptop, a k8s cluster, or 3 AWS regions**   | One binary. Mode is config. No cloud-specific primitives on the request path.                                                         |
-| **Secure by default**                                                   | mTLS on every listener; plaintext is not buildable. Cert rotation online with a 24 h overlap window.                                  |
-| **Resilient cluster ops**                                               | Rolling upgrades with N / N+1 minor-version skew. Node loss healed by Merkle anti-entropy without taking traffic offline.             |
+| If you need...                                                          | GossamerDB gives you                                                                                                                                                    |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sub-millisecond reads at the request level** under quorum consistency | GET p99 < 1 ms with `N=5, R=3` via parallel fastest-of-5 fan-out and a mandatory cache layer.                                                                           |
+| **Tunable consistency without the footgun**                             | Per-request named levels — `ONE`, `QUORUM`, `ALL` — that map to operator-controlled numerics. No raw `R=1` calls on the billing path.                                   |
+| **Operate the same way on a laptop, a k8s cluster, or 3 AWS regions**   | One binary. Mode is config. No cloud-specific primitives on the request path.                                                                                           |
+| **Secure by default**                                                   | mTLS on every listener; plaintext is not buildable. Cert rotation online with a 24 h overlap window.                                                                    |
+| **Resilient cluster ops**                                               | Rolling upgrades with N / N+1 minor-version skew. Node loss healed by Merkle anti-entropy without taking traffic offline.                                               |
 | **First-class observability**                                           | OpenTelemetry traces, metrics, and logs over OTLP, routed through an OTel Collector to Prometheus + Tempo + Loki, viewed in Grafana — full reference stack ships in v1. |
 
 ## Performance commitments (v1.0 GA)
 
 These are the published numbers the bench gate enforces. They are commitments — not aspirations.
 
-| Operation                      | p50    | p95    | p99     | Notes                                                   |
-| ------------------------------ | ------ | ------ | ------- | ------------------------------------------------------- |
-| **GET** (any consistency)      | 100 µs | 200 µs | < 1 ms  | Request-level, intra-AZ, `N=5, R=3 of 5`.               |
-| **PUT** (quorum write)         | 500 µs | 1 ms   | 5 ms    | `N=5, W=3 of 5`, intra-AZ.                              |
-| Cluster throughput             | —      | —      | —       | ≥ **1,000,000 ops/s** sustained, 80/20 read/write mix.  |
-| Hot-key throughput             | —      | —      | —       | ≥ **1,000 ops/s** on a single key without budget loss.  |
-| Cross-region replication lag   | —      | —      | < 2 s   | Async; assumes ≤ 100 ms inter-region p99 RTT.           |
-| Coordinator failover (RTO)     | —      | —      | < 30 s  | RPO 0 (Raft-quorum-committed metadata).                 |
+| Operation                    | p50    | p95    | p99    | Notes                                                  |
+| ---------------------------- | ------ | ------ | ------ | ------------------------------------------------------ |
+| **GET** (any consistency)    | 100 µs | 200 µs | < 1 ms | Request-level, intra-AZ, `N=5, R=3 of 5`.              |
+| **PUT** (quorum write)       | 500 µs | 1 ms   | 5 ms   | `N=5, W=3 of 5`, intra-AZ.                             |
+| Cluster throughput           | —      | —      | —      | ≥ **1,000,000 ops/s** sustained, 80/20 read/write mix. |
+| Hot-key throughput           | —      | —      | —      | ≥ **1,000 ops/s** on a single key without budget loss. |
+| Cross-region replication lag | —      | —      | < 2 s  | Async; assumes ≤ 100 ms inter-region p99 RTT.          |
+| Coordinator failover (RTO)   | —      | —      | < 30 s | RPO 0 (Raft-quorum-committed metadata).                |
 
 ## Features
 
@@ -110,16 +110,16 @@ A single binary set; the deployment mode is selected by configuration, not by se
 
 - **Coordinator (capital C).** A 3-node embedded-Raft group owning cluster metadata: membership, partition map, strategy config, rolling-upgrade orchestration. **Strictly control-plane** — never on the per-request data path. A complete Coordinator outage pauses control-plane mutations only; reads and writes continue uninterrupted.
 - **Data nodes.** Hold a slice of the partition ring, the **in-memory KV store** (no per-node disk persistence in v1), the cache layer, gossip and anti-entropy participants, and the gRPC + REST surfaces. State on a restarting node hydrates via Merkle anti-entropy from peers; durable backstop for full-cluster outage is `gossamerctl snapshot` to the operator-selected backup destination.
-- **Request routing (no extra hops).** The smart Go client routes directly to one of the 5 owning replicas using its local copy of the partition map. That node becomes the *request coordinator* (lowercase) — its local read counts toward the `R=3` quorum, and it issues two parallel reads to peers, returning on the fastest 3 responses. REST and non-Go clients use a stateless any-data-node forwarding fallback through a plain L4 load balancer.
+- **Request routing (no extra hops).** The smart Go client routes directly to one of the 5 owning replicas using its local copy of the partition map. That node becomes the _request coordinator_ (lowercase) — its local read counts toward the `R=3` quorum, and it issues two parallel reads to peers, returning on the fastest 3 responses. REST and non-Go clients use a stateless any-data-node forwarding fallback through a plain L4 load balancer.
 
 ## Documentation
 
-| Document                          | Path                                                 |
-| --------------------------------- | ---------------------------------------------------- |
-| Initial requirements (Wiki)       | [`docs/wiki/gossamerdb.md`](docs/wiki/gossamerdb.md) |
-| Product Requirements (PRD v1.4)   | [`docs/prds/gossamerdb.md`](docs/prds/gossamerdb.md) |
-| Documentation index               | [`docs/README.md`](docs/README.md)                   |
-| Project rules & conventions       | [`CLAUDE.md`](CLAUDE.md)                             |
+| Document                        | Path                                                 |
+| ------------------------------- | ---------------------------------------------------- |
+| Initial requirements (Wiki)     | [`docs/wiki/gossamerdb.md`](docs/wiki/gossamerdb.md) |
+| Product Requirements (PRD v1.4) | [`docs/prds/gossamerdb.md`](docs/prds/gossamerdb.md) |
+| Documentation index             | [`docs/README.md`](docs/README.md)                   |
+| Project rules & conventions     | [`CLAUDE.md`](CLAUDE.md)                             |
 
 The HLD, LLD, Epic breakdown, and per-story implementation plans land under `docs/hld/`, `docs/lld/`, `docs/epics/`, and `docs/stories/` once the design phase completes.
 
@@ -139,7 +139,7 @@ go build ./...                       # build all packages
 go test ./...                        # run tests
 golangci-lint run                    # lint
 go mod tidy                          # tidy modules
-./.claude/scripts/bench-check.sh     # enforce the < 1 ms p99 GET SLO
+./scripts/bench-check.sh             # enforce the < 1 ms p99 GET SLO
 ```
 
 Branching, PR cadence, the draft-PR pattern, and the bench gate are documented in [`CLAUDE.md`](CLAUDE.md).
