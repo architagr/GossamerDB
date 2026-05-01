@@ -2,7 +2,7 @@
 
 **Author:** Archit Agarwal
 
-**Status:** Draft v1.4 — derived from `docs/wiki/gossamerdb.md`; confirmed scale & latency targets, Coordinator HA model, data-plane routing topology, and quorum semantics (cluster-level configurable N/R/W with per-request named consistency `{ONE, QUORUM, ALL}` only — Option C) folded in 2026-04-28
+**Status:** Draft v1.9 — DM-4 resolved: FR-15 now locks the post-restart observable contract (2xx + re-apply), names `TestIdempotencyAfterNodeRestart` as the acceptance test, and adds `idempotency_dedup_miss_total` to the FR-11 metrics surface. §14 trimmed to the 11 still-open DM gaps (resolved DMs moved to revision history for the audit trail). Carries forward all v1.8 content. See revision history for full changelog.
 
 **Upstream input:** `docs/wiki/gossamerdb.md`
 
@@ -23,6 +23,10 @@
 | 2026-04-28 | v1.4 | Q4 (Quorum semantics & defaults) confirmed by user — **Option C** chosen: cluster config owns the numerics (`N`, `W`, `R`); per-request consistency is **named only** (`{ONE, QUORUM, ALL}`), no arbitrary numeric R/W tuples allowed at the API surface. Default per-request consistency = `QUORUM`. Default cluster numerics = `N=5, W=3, R=3` (already locked in v1.1). Cascaded into FR-2 (rewritten — "explicit R/W tuples" clause dropped), J-A-1 (request-option syntax updated), FR-20 (SDK accepts named consistency), and the §11 Q4 row. Wiki §9.1 expanded; §9.2 renumbered to 16 items.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Archit Agarwal |
 | 2026-04-29 | v1.5 | **Q9 (auth) and Q10 (compliance + residency) closed.** Q9: mTLS-identity-only auth surface for v1 confirmed; added forward-compat `principal` hook (handshake-derived, pinned to connection, threaded through every handler, emitted on FR-16 audit log + OTel spans) so v1.1 RBAC plugs in without a wire change. Capability tokens / JWT explicitly rejected for v1 on hot-path-cost grounds. Q10 split into (a) certifications and (b) residency: no certs in v1 with a SOC2 CC-series mapping doc shipped instead; **cluster-level data residency** added as NFR-SEC-7 + new §6.5 Data residency model. New NG10 (no application-layer compliance features). Cascaded into FR-16 (audit schema with `principal`, `key_hash`, region events), FR-20 (new clause h on principal surfacing), §11 Q9 (full rewrite with rejected alternatives expanded), §11 Q10 (full rewrite split into certifications + residency), §1.2 NG10 added, §4.4 NFR-SEC-7 added, §6.5 added, OD-2 resolved-with-residual-marketing-signoff. Wiki §9.2 #1 and #2 moved to §9.1; stale §9.2 items 3–6 also moved to §9.1 since the PRD already resolves them in Q12/Q15/Q19/Q20. Three new SLO risks added (R10–R12).                                                                                                                                                                                                                                                                                                                                                                         | Archit Agarwal |
 | 2026-04-30 | v1.6 | **Ambiguity sweep A1–A7 folded in + SLO-bite features tightened.** **A1** cache contract for `R=QUORUM` reads locked into FR-12, NFR-PERF-2, and §6.3 — cache key is `(key, partition_map_epoch)` with default TTL 100 ms / ceiling 500 ms; both `ONE` and `QUORUM` results populate the cache; `siblings` divergent results are non-cacheable. **A2** FR-15 idempotency dedup explicitly noted as in-memory + does-not-survive-restart, with an `idempotency_persisted` SDK metric. **A3** NFR-PERF-3 hydration burst budget (50%/50% for up to 10 min, ceiling 30 min) so cold-restart nodes refill quickly while peers throttle outbound to a `node_role=hydrating` peer. **A4** FR-20.d second-`WRONG_OWNER` falls back to FR-8 tier 3 with `partition_map_thrash_total` metric. **A5** FR-19 rate-limit subject = cert serial + issuer DN (not SAN), 8-way sharded buckets, `BenchmarkHotPrincipalGet` bench-gates the < 1 ms p99 under saturation. **A6** FR-7 Raft snapshot cadence = 10k entries or 1 GiB log; SSD/NVMe required for the Raft log volume. **A7** FR-21 region-epoch propagated on every gossip message symmetric with partition-map epoch; SDK refresh is identical to `WRONG_OWNER`. Plus FR-20.g now mandates **primary-region auto-discovery + steady-state pinning** so passive-misrouting is a recovery path, not a steady-state cost. **R1 strengthened** with explicit HLD measurement plan for parallel-3-of-5 GET QUORUM (dispatch / network / reconcile / marshal sub-budgets) and a binding `BenchmarkGetQuorumRequestLevel` GA gate. | Archit Agarwal |
+| 2026-05-01 | v1.7 | **Delivery Manager review pass.** Added 8 Mermaid architecture diagrams to §6 (system topology, coordinator Raft HA, Get/Put request lifecycle, cache invalidation flow, active-passive multi-region topology, rolling upgrade sequence, mTLS/PKI flow) and milestone dependency DAG to §7. Added new §6.4 (active-passive multi-region topology) fixing the §6 numbering gap. Added §14 (DM review — 20 identified gaps). Applied 5 immediate fixes: OD-1 stale default updated to v1.1-confirmed 1M ops/s numbers (DM-12); OD-6 needs-by moved from `pre-LLD` to `pre-HLD` (DM-13); FR-21 replication backlog cap locked to 500 MiB / 30 s defaults (DM-8); §9 GA criteria clarified which SHOULD-level FRs are GA-blocking vs GA-aspirational (DM-11); §13 Hand-off updated with two required runbook deliverables (DM-14, DM-15). Remaining 15 DM gaps are recorded in §14 for the Architect and EM to address before HLD sign-off.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Archit Agarwal |
+| 2026-05-01 | v1.8 | **DM-3 resolved.** FR-7 now locks a **provisional Raft-log IOPS floor of ≥ 3,000 IOPS sustained 4 KiB random write with fsync** (measured by `fio --rw=randwrite --bs=4k --fdatasync=1 --iodepth=1`), making the SSD/NVMe disk requirement testable at GA. The cluster-bootstrap pre-flight in FR-13 MUST refuse to initialize a coordinator whose `fio` probe falls below the floor. Added new **OD-7** (Outstanding Decision) capturing the floor as a `pre-HLD` default with a `pre-LLD` open question on whether the floor needs to rise based on measured Raft commit-loop fsync latency under target load. §14 DM-3 marked RESOLVED.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Archit Agarwal |
+| 2026-05-02 | v1.10 | **DM-1, DM-2, DM-5 resolved.** **DM-1:** §9 J-O-1 entry expanded into a 3-row table naming `TestClusterBringUpLocal` (60 s, every-PR), `TestClusterBringUpK8s` (3 min, nightly + pre-merge `develop`), and `TestClusterBringUpMultiRegionAWS` (10 min, pre-tag on `release/*`); codified `t0` = first coordinator `start` call, `t1` = first poll where `coordinator_quorum ∧ all_data_nodes_alive ∧ partition_map_epoch>0 ∧ gossip_converged` holds for two consecutive 5 s polls; image-pull excluded via pre-pull harness; ownership = Project Lead (CI) + Architect (sign-off). **DM-2:** FR-5 / NFR-PERF-3 now bench-gated by `BenchmarkAntiEntropyUnderLoad` (1 MiB divergent range repair under saturation foreground load) asserting four properties — GET p99 < 1 ms, PUT p99 < 5 ms, anti-entropy CPU ≤ 5%, NIC ≤ 10%; hydration variant `BenchmarkAntiEntropyHydrationBurst` enforces the 50%/50% burst caps. OD-6 taxonomy extended with the "background-work-under-load" category covering this class of bench. **DM-5:** NFR-AVAIL-2 now bench-gated by `SoakChaosReplicaKill` (`//go:build chaos`, internal/chaos/) — 72 h sustained NFR-SCALE-3 load with uniformly-random 1-of-5 replica killed every 5–15 min (15 s min recovery gap); pass thresholds R=ONE ≤ 0.01% / R=QUORUM ≤ 0.05% rolling-72h error rate, and no rolling 5-min window above 5×; nightly `SoakChaosReplicaKillSmoke` runs at 4 h with halved thresholds. Full run gates `release/*` pre-tag; smoke gates nightly. §14 trimmed: open count 11 → 8; resolved count 9 → 12 (DM-1, DM-2, DM-5 added to the resolved list). | Archit Agarwal |
+| 2026-05-02 | v1.9 | **DM-4 resolved + §14 trimmed.** FR-15 now locks the **post-restart observable contract** for idempotent writes: a duplicate request landing on a freshly-restarted owner during the dedup window MUST return **2xx with re-apply** — no distinct error code, because emitting one would require persistent dedup state that v1 explicitly opted out of (A2). Added **`TestIdempotencyAfterNodeRestart`** as the named acceptance test (asserts 2xx, observable re-apply, and metric increment). Added new metric **`idempotency_dedup_miss_total`** to FR-11's standard OTel metrics surface so operators can size their own application-layer ledger needs. §14 cleaned up: the 9 already-resolved DMs (DM-3, 4, 8, 11, 12, 13, 14, 15, 20) were removed from §14 to keep the open-issues list scannable; their audit trail lives in this revision history. The 11 still-open DMs (DM-1, 2, 5, 6, 7, 9, 10, 16, 17, 18, 19) remain in §14 for the Architect and EM to address before HLD sign-off.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Archit Agarwal |
 
 > This PRD resolves the 20 open questions raised in `docs/wiki/gossamerdb.md §9`. Every resolution is recorded inline in §11 with the rejected alternatives. Items still requiring business confirmation are listed in §12 ("Outstanding Decisions") with a recommended default and a `needs-by` deadline tag.
 
@@ -103,7 +107,7 @@ The wiki's `F-MUST-*` / `F-SHOULD-*` / `F-COULD-*` items are restated here as PR
 - **FR-4. Vector clocks + conflict resolution.** Per-key vector clocks attached to every write. Two strategies ship in v1, **selectable at cluster bootstrap and not hot-swappable** (restart-pace change only — see FC-1 / Q13). **Application-supplied merge functions are not a v1 strategy** — `siblings` is the supported path for teams that need application-level merge semantics.
   - **`lww` (default):** on concurrent writes, **highest vector clock wins** under a deterministic total order over the clock (lexicographic over sorted `(nodeId, counter)` entries — LLD locks the exact comparator). No wall-clock timestamps participate in the decision; this prevents clock-skew-driven write loss.
   - **`siblings` (Riak-style):** when a `Get` finds divergent values for a key, the response carries **all sibling values + their vector-clock contexts in a single payload** (no separate `GetSiblings` call). The client picks/merges and writes back with a clock that descends from all siblings, which collapses them on the next write. Anti-entropy preserves siblings; only a descendant write collapses them.
-- **FR-5. Merkle anti-entropy.** Per-range Merkle trees compared on a configurable cadence (default **5 min**, with jitter). Divergent ranges reconciled via the active conflict-resolution strategy. Anti-entropy is **bounded** in CPU and bandwidth (see NFR-PERF-3).
+- **FR-5. Merkle anti-entropy.** Per-range Merkle trees compared on a configurable cadence (default **5 min**, with jitter). Divergent ranges reconciled via the active conflict-resolution strategy. Anti-entropy is **bounded** in CPU and bandwidth (see NFR-PERF-3). **Bench-gated bound (DM-2 fix):** the bound is enforced by **`BenchmarkAntiEntropyUnderLoad`** (lives in `internal/antientropy/antientropy_bench_test.go`), which exercises the full request path on a node while a 1 MiB divergent range is being repaired between that node and a peer. The benchmark **MUST** assert (a) GET p99 stays **< 1 ms** under saturation foreground load (NFR-PERF-1a, request-level), (b) PUT p99 stays **< 5 ms** (NFR-PERF-1b), (c) the repairing node's CPU share for the anti-entropy goroutine pool stays **≤ 5%** (NFR-PERF-3 steady-state cap), and (d) outbound NIC share for the repair stays **≤ 10%** (NFR-PERF-3 steady-state cap). Any of these four assertions failing the bench fails the gate. The bench is tagged **`cache-bound`** in the OD-6 taxonomy (latency assertions a/b are gated at the < 1 ms / < 5 ms thresholds respectively; CPU/NIC assertions c/d are absolute caps, not relative regressions). Hydration-burst variant (`BenchmarkAntiEntropyHydrationBurst`) asserts the same latency budget while the local node runs at the 50%/50% burst budget for ≤ 10 min (A3 / NFR-PERF-3 hydration exception); peers throttling outbound to it MUST be observable via the `node_role=hydrating` metric.
 - **FR-6. mTLS by default + operator-supplied PKI via `pki.Source` interface.** Every TCP listener requires mTLS. Plaintext listeners are not buildable into the binary — there is no `--insecure` flag in v1 (Sam-friendly). **Cert source is abstracted as a `pki.Source` interface**; v1 ships two implementations:
   - **`disk`** — cert / key / trust-bundle paths configured in the cluster YAML. **Hot-reload via fsnotify** on file change.
   - **`k8s-secret`** — references a k8s Secret by name. Watches the Secret API for updates and hot-reloads. **cert-manager integrates "for free"** here: operators point a cert-manager `Certificate` at the same Secret, and rotation flows through automatically.
@@ -114,7 +118,7 @@ The wiki's `F-MUST-*` / `F-SHOULD-*` / `F-COULD-*` items are restated here as PR
   - **Permanently rejected: built-in CA.** GossamerDB is not a CA: chicken-and-egg trust on bootstrap (the cert is what establishes the coordinator's identity) and CA responsibility (key custody, revocation lists, issuance audit) is a different product than a KV store.
   - **Deferred to v1.x via the same `pki.Source` interface (no API break):** `spiffe` (SPIRE Workload API), `vault` (Vault Agent / Vault PKI engine).
   - See §11 Q8.
-- **FR-7. Coordinator HA (control plane).** The Coordinator runs as a **3-node embedded-Raft group** owning cluster metadata (membership, partition map, strategy config, rolling-upgrade orchestration). **Strictly control-plane** — never on the per-request data path (see FR-8). Coordinator failure pauses control-plane mutations only; foreground reads and writes continue uninterrupted. **Durability split:** the **Raft commit log** lives on **each coordinator node's local disk** (Raft requires a synchronous local fsync per commit for soundness — non-negotiable). **Raft snapshots and the partition-map archive** ship to the **operator-selected backup destination** (`s3` or `postgres`, see FR-12). The local Raft log is bounded by snapshot cadence; the snapshot is the durable backstop for full-coordinator-group rebuild. **Snapshot cadence (A6):** snapshot every **10,000 Raft entries or 1 GiB of log**, whichever first; LLD may tune both knobs but must keep partial-failover replay time bounded at < 30 s (NFR-AVAIL-3 RTO). **Disk requirement:** Raft log volume must be SSD/NVMe (HDD fsync latency blows the per-commit budget); LLD locks the exact IOPS floor.
+- **FR-7. Coordinator HA (control plane).** The Coordinator runs as a **3-node embedded-Raft group** owning cluster metadata (membership, partition map, strategy config, rolling-upgrade orchestration). **Strictly control-plane** — never on the per-request data path (see FR-8). Coordinator failure pauses control-plane mutations only; foreground reads and writes continue uninterrupted. **Durability split:** the **Raft commit log** lives on **each coordinator node's local disk** (Raft requires a synchronous local fsync per commit for soundness — non-negotiable). **Raft snapshots and the partition-map archive** ship to the **operator-selected backup destination** (`s3` or `postgres`, see FR-12). The local Raft log is bounded by snapshot cadence; the snapshot is the durable backstop for full-coordinator-group rebuild. **Snapshot cadence (A6):** snapshot every **10,000 Raft entries or 1 GiB of log**, whichever first; LLD may tune both knobs but must keep partial-failover replay time bounded at < 30 s (NFR-AVAIL-3 RTO). **Disk requirement:** Raft log volume must be SSD/NVMe (HDD fsync latency blows the per-commit budget). **Provisional IOPS floor (DM-3 fix):** **≥ 3,000 IOPS sustained 4 KiB random write with fsync** per coordinator node, measured with `fio --rw=randwrite --bs=4k --fdatasync=1 --iodepth=1`. This is the pre-HLD default — sufficient for the 10k-entries / 1 GiB snapshot cadence at expected metadata-mutation rates with ≥ 5× headroom for traffic spikes. The LLD MAY tighten or revise the floor based on measured Raft commit-loop fsync latency under target load, but the PRD-level floor MUST NOT be removed. Tracked in OD-7. Operators on volumes that fail the floor are unsupported for v1 GA; the cluster-bootstrap pre-flight check (FR-13 admin API) MUST refuse to initialize a coordinator whose `fio` probe falls below the floor.
 - **FR-8. Data-plane routing (three-tier preference order).** Clients reach data on a layered path designed to minimise network hops under the < 1 ms GET p99 budget. Tier ordering, in preference:
   1. **Smart Go client SDK (primary path).** The SDK owns a gossip-propagated copy of the partition map (refreshed on epoch change — see FR-20) and routes each `Get` / `Put` directly to one of the **5 owning replicas** by hashing the key. **One client-to-cluster network hop.** This is the path that must clear NFR-PERF-1a / NFR-PERF-1b.
   2. **Coordinator-as-replica fan-out.** The chosen owner replica acts as the **request coordinator** (lowercase — explicitly distinct from the Raft Coordinator group in FR-7). Its local read counts toward the `R=3` quorum; it issues **parallel** reads/writes to the other 4 owners and returns on the **fastest 3 responses** (R=3 of 5 for GET, W=3 of 5 for PUT), reconciling via vector clocks before applying the active conflict-resolution strategy. Maximum **2 parallel cross-replica hops**, not 3 sequential.
@@ -125,7 +129,7 @@ The wiki's `F-MUST-*` / `F-SHOULD-*` / `F-COULD-*` items are restated here as PR
   - **Kubernetes:** Helm chart + StatefulSet for data nodes, separate StatefulSet for the 3-node coordinator group, headless services for peer discovery.
   - **Multi-region AWS:** EKS-based (k8s mode generalised). Cross-region behaviour is a **per-cluster opt-in** governed by **`cross_region.mode`** (FR-21): `none` for single-region clusters, `active_passive` for 1 primary + N passive regions with async replication. Per-region gossip tiers via region-aware SWIM (FR-3). See §11 Q11, FR-21.
 - **FR-10. Rolling upgrades.** Coordinator orchestrates a one-at-a-time data-node upgrade with health gates. **N / N+1 minor-version skew is supported.** Rollback = roll the same upgrade in reverse on the previous binary.
-- **FR-11. OpenTelemetry instrumentation — three signals on one wire.** Traces (W3C Trace Context propagated via gRPC metadata and HTTP headers), metrics (RED on the request path; queue depths, gossip round-trip, anti-entropy bytes-repaired on the background paths), and structured logs (audit + operational). **OTLP gRPC is the single export transport** for all three signals — GossamerDB does not embed direct Prometheus / Tempo / Loki exporters. **Architecture is OTel-Collector-mediated**: GossamerDB → OTLP → OpenTelemetry Collector → fans out to Prometheus (metrics), Tempo (traces), Loki (logs). Operators may also scrape `/metrics` directly via Prometheus as a **secondary back-compat path** (kept because some existing Prom-only operator stacks pull rather than receive). **Logs use OTLP logs (OTel-native);** stdout JSON is a fallback when the Collector is unreachable. (§11 Q16.)
+- **FR-11. OpenTelemetry instrumentation — three signals on one wire.** Traces (W3C Trace Context propagated via gRPC metadata and HTTP headers), metrics (RED on the request path; queue depths, gossip round-trip, anti-entropy bytes-repaired, **`idempotency_dedup_miss_total` (DM-4 fix — counts post-restart dedup misses, see FR-15)** on the background paths), and structured logs (audit + operational). **OTLP gRPC is the single export transport** for all three signals — GossamerDB does not embed direct Prometheus / Tempo / Loki exporters. **Architecture is OTel-Collector-mediated**: GossamerDB → OTLP → OpenTelemetry Collector → fans out to Prometheus (metrics), Tempo (traces), Loki (logs). Operators may also scrape `/metrics` directly via Prometheus as a **secondary back-compat path** (kept because some existing Prom-only operator stacks pull rather than receive). **Logs use OTLP logs (OTel-native);** stdout JSON is a fallback when the Collector is unreachable. (§11 Q16.)
 - **FR-12. Storage — in-memory data nodes + operator-selected backup destination.** **Data-node storage in v1 is in-memory only** (Go `sync.Map` / sharded map; LLD locks the exact structure). No durable per-node data backend ships in v1. The cluster relies on `N=5 / W=3 / R=3` replication and Merkle anti-entropy (FR-5) for in-cluster fault tolerance. **Single-node restarts hydrate via anti-entropy from peers** — no per-node disk persistence is required for the data plane. **A simultaneous loss of all 5 replicas of a key range = data loss in v1**, mitigated only by the snapshot tool (FR-18). Pluggable durable per-node data backend (Pebble, RocksDB, etc.) deferred to v1.x.
   - **Operator-selected backup destination** (cluster-bootstrap config): exactly one of **`s3`** (S3-compatible object storage) or **`postgres`** (PostgreSQL `bytea` table). The chosen destination is shared by **both** consumers — data-node snapshots from `gossamerctl snapshot` (FR-18) and coordinator Raft snapshots / partition-map archive (FR-7). Pluggable via `backup.Destination`; further destinations in v1.x without API breaks.
   - **Sizing guidance.** `s3` recommended for clusters with > ~50 GiB total state or > 32 nodes; `postgres` recommended for small clusters / dev / control-plane-only. LLD locks the exact threshold and operator-warning behaviour.
@@ -133,7 +137,7 @@ The wiki's `F-MUST-*` / `F-SHOULD-*` / `F-COULD-*` items are restated here as PR
   - **Cache contract for QUORUM reads (A1).** The single-instance cache (`sync.Map`-backed, in-process) and the cross-instance Redis cache **MAY populate from a successful `R=QUORUM` result** under a strict TTL: **default 100 ms**, ceiling **500 ms**, configurable per cluster but never disabled. Cache entries are keyed by `(key, partition_map_epoch)` — **not** by vector-clock hash, because under `lww` the cache value is "whatever the most recent write at any owner is" and re-keying by vc-hash makes the cache useless under hot-key writes (NFR-SCALE-3a, 1k QPS per key). **Mandatory invalidation paths** (NFR-PERF-2): local `Put`/`Delete` on the request-coordinator replica, `Delete` propagated via gossip, anti-entropy repair touching the key, and partition-map epoch bump (the epoch is part of the cache key, so this is automatic). **The TTL exists for the case the invalidation message is dropped** — bounding worst-case staleness to TTL. Cache eligibility under `siblings` mode: cached only when the `Get` result has zero siblings (single value); divergent results are never cached because the application is expected to read-and-resolve.
 - **FR-13. Admin API.** gRPC surface on the coordinator Raft leader: membership inspection, partition map dump, anti-entropy trigger, rolling-upgrade orchestration, strategy change (restart-pace), **region promotion** (`Promote(new_primary)`) and **passive reseed** (`Reseed(from_region)`) for active-passive clusters (FR-21). **Authenticated via mTLS client cert with `admin.<cluster>` SAN** — cluster name embedded so an `admin.foo` cert cannot drive `cluster=bar` (FR-6 identity scheme).
 - **FR-14. CLI.** `gossamerctl` wraps the admin API. Ships in v1 covering all admin RPCs — including `gossamerctl promote --new-primary=<region>` and `gossamerctl reseed --from=<region>` for active-passive failover (FR-21). Web UI does not ship in v1.
-- **FR-15. Idempotent writes.** `Put` and `Delete` accept an optional client-supplied request ID; duplicates within a configurable window (default **5 min**) are de-duplicated at the responsible coordinator-replica. **Dedup state is in-memory and does not survive a node restart (A2)** — consistent with the in-memory-only data plane (FR-12). The 5-minute window is therefore **best-effort within process lifetime**; a retry that lands on a freshly-restarted owner during the window may apply twice. Money-handling and exactly-once workloads must layer their own request-ID ledger on top of GossamerDB until durable per-node storage ships in v1.x. The SDK marks the operation's `idempotency_persisted` metric `false` in v1 so observability tooling can flag at-risk traffic.
+- **FR-15. Idempotent writes.** `Put` and `Delete` accept an optional client-supplied request ID; duplicates within a configurable window (default **5 min**) are de-duplicated at the responsible coordinator-replica. **Dedup state is in-memory and does not survive a node restart (A2)** — consistent with the in-memory-only data plane (FR-12). The 5-minute window is therefore **best-effort within process lifetime**; a retry that lands on a freshly-restarted owner during the window may apply twice. Money-handling and exactly-once workloads must layer their own request-ID ledger on top of GossamerDB until durable per-node storage ships in v1.x. The SDK marks the operation's `idempotency_persisted` metric `false` in v1 so observability tooling can flag at-risk traffic. **Post-restart observable contract (DM-4 fix):** a duplicate request that lands on a freshly-restarted owner during the window **MUST be treated as a fresh write** — server returns the normal **2xx success** with the new vector clock and the operation is re-applied. The PRD does NOT promise a distinct error code (e.g., `IDEMPOTENCY_WINDOW_CROSSED`) on re-delivery, because emitting one would require persistent dedup state that v1 explicitly opted out of (A2); the documented contract is "may apply twice within the window" and the response surface reflects exactly that. **Acceptance test (named):** `TestIdempotencyAfterNodeRestart` exercises the path: client submits write with request-id, owner restarts mid-window, client retries with the same request-id, test asserts (a) server returns 2xx, (b) the write is observable as re-applied (vector clock advances or value mutates as expected), and (c) the new metric `idempotency_dedup_miss_total` increments by one. **Operator-visible metric (DM-4 fix):** `idempotency_dedup_miss_total{cluster, region}` — counter, incremented every time an idempotent request arrives with a request-id that **would have been deduped** had dedup state survived restart (i.e., request-id matches an entry the owner used to have but lost on restart, detected by piggyback request-id metadata in the replicated write). Operators chart this against `idempotency_persisted{result="false"}` to size their own application-layer ledger needs. The metric is part of the standard FR-11 OTel metrics surface — not an FR-15-only footnote.
 - **FR-16. Audit logging.** Distinct OTel log stream `gossamer.audit` for: admin-API calls, mTLS handshake failures (with the rejecting reason — expired cert / unknown CA / SAN mismatch / cluster-name mismatch), config changes, strategy changes, rolling-upgrade events, **cert reload events** (every fsnotify- or k8s-Secret-driven reload, including the new cert's NotBefore / NotAfter / SAN list), certificate rotation events, **region promotion / reseed events** (FR-21), and **every data-plane mutation** (`Put`, `Delete`) at sampled cadence — sample rate is configurable per cluster, default **0%** for the data plane (off) so that the < 1 ms GET p99 budget is not impacted by audit emission on the hot path. **Stable schema fields per record:** `ts`, `event_type`, `principal` (cert-derived, see Q9), `cluster`, `region`, `key_hash` (for data-plane events; never the raw key — privacy), `outcome`, `reason`. **`principal` is the FR-9 forward-compat hook** that lets v1.1 RBAC turn audit attribution into authz decisions without a wire change.
 
 ### 3.2 SHOULD (v1.0 — best-effort, may slip to v1.x without breaking GA)
@@ -154,7 +158,7 @@ The wiki's `F-MUST-*` / `F-SHOULD-*` / `F-COULD-*` items are restated here as PR
   - **`none` (default for new clusters):** single-region only. No WAN traffic. Recommended for small teams without a multi-region requirement.
   - **`active_passive`:** one designated **primary region** owns writes; **N passive regions** (≥1, no upper bound — covers global DR shapes such as US + EU + APAC) receive writes asynchronously from the primary. Cluster bootstrap config: `primary_region: <region>`, `passive_regions: [<region>, ...]`.
   - **Replication contract.** Writes committed at the primary are streamed to passives via the same gossip layer (Plumtree when enabled, SWIM piggyback otherwise) carrying the vector-clock-tagged value. **Lag target p99 < 2 s** under ≤ 100 ms inter-region p99 RTT (NFR-SCALE-8). Replicated state includes both data-plane KV writes and control-plane partition-map / strategy-config snapshots so a passive can take over correctly on promotion.
-  - **Backpressure under passive-region outage (R12).** Primary-region writes ack locally and never block on passive lag. The outbound replication queue per passive is **bounded** (default cap LLD-locked, e.g. 500 MiB or 30 s of writes — whichever is smaller). When the cap is breached: emit a saturation alert via `cross_region_replication_backlog_bytes`, **drop the oldest queued entries** with an audit-log entry (`event_type=cross_region_drop`), and surface a Grafana alert with a runbook pointing at `gossamerctl reseed` once the passive returns. **Recovery from a long outage = full reseed**, not catch-up replay.
+  - **Backpressure under passive-region outage (R12).** Primary-region writes ack locally and never block on passive lag. The outbound replication queue per passive is **bounded** — **default cap: 500 MiB or 30 s of aggregate write volume, whichever is smaller** (LLD may tune within 2×; both bounds must be configurable per passive via `cross_region.passive_backlog_max_bytes` and `cross_region.passive_backlog_max_seconds`). When the cap is breached: emit a saturation alert via `cross_region_replication_backlog_bytes`, **drop the oldest queued entries** with an audit-log entry (`event_type=cross_region_drop`), and surface a Grafana alert with a runbook pointing at `gossamerctl reseed` once the passive returns. **Recovery from a long outage = full reseed**, not catch-up replay. _(DM-8 fix: cap default was "LLD-locked" — locked here at PRD level to unblock M11 exit criterion.)_
   - **Passive-region read semantics.** Server accepts `consistency=ONE` reads locally (eventual consistency, up to ~2 s stale); `QUORUM` and `ALL` reads return **`WRONG_REGION(primary=<region>)`**. Smart Go SDK transparently retries against the primary (FR-20.g); non-Go callers see the error and choose.
   - **Passive-region write semantics.** All writes against a passive return `WRONG_REGION`. Smart Go SDK transparently routes writes to the primary (one cross-region hop, surfaced via `cross_region_writes_total`).
   - **Failover (manual only in v1).** `gossamerctl promote --new-primary=<region>` flips the cluster's primary. The Raft Coordinator group propagates the change via gossip; the new primary starts accepting writes; the **old primary is fenced** (refuses to accept writes when it returns) until `gossamerctl reseed --from=<region>` wipes its in-memory state and resyncs from the new primary via anti-entropy. **No automatic region failover in v1** — region-level promotion is intentionally operator-gated to avoid split-brain without the cross-region merge machinery (deferred to v1.2 alongside active-active).
@@ -200,13 +204,13 @@ The project-wide **< 1 ms p99 cache-call SLO** from `CLAUDE.md` is carried forwa
 - **NFR-PERF-1a. GET request budget (request-level, intra-AZ).** p50 ≤ **100 µs**, p95 ≤ **200 µs**, p99 ≤ **1 ms** at `N=5`, `R=3` (quorum) or `R=1`. The bench gate enforces the 1 ms p99 ceiling on the full GET path, not only the cache-hit sub-path.
 - **NFR-PERF-1b. PUT request budget (request-level, intra-AZ).** p50 ≤ **500 µs**, p95 ≤ **1 ms**, p99 ≤ **5 ms** at `N=5`, `W=3` (quorum). The bench gate ledger tracks PUT separately and fails on regression; PUT p99 is **not** subject to the 1 ms cache-call SLO (it is replication-bound).
 - **NFR-PERF-2.** The cache layer (Redis cross-instance, in-memory LRU / `sync.Map` single-instance) is mandatory for any path subject to the < 1 ms gate. Cache invalidation must be **explicit and tested** (mandatory invalidation test per cache). **Cache key shape and TTL contract (A1):** entries are keyed by `(key, partition_map_epoch)`, default TTL **100 ms**, ceiling **500 ms**, configurable per cluster but never disabled. Both `R=ONE` and `R=QUORUM` results are eligible for cache population; `siblings`-mode divergent results are not cacheable. See §6.3 and FR-12 for the binding contract.
-- **NFR-PERF-3.** Anti-entropy and gossip are **bounded background work**: each is capped at a per-node CPU share (default 5%) and outbound bandwidth share (default 10% of NIC) — both configurable. They MUST NOT pre-empt foreground request budgets. **Hydration-burst exception (A3):** a freshly-rejoined data node (cold restart, post-replacement, or post-reseed) is allowed to run anti-entropy at a **hydration burst budget — default 50% CPU / 50% NIC for up to 10 minutes** before dropping back to steady-state caps. The bursting node tags itself `node_role=hydrating` in gossip so peers throttle their own outbound to it accordingly (avoids the hydrating node DOSing the cluster on its own behalf). Burst budget is configurable per cluster but bounded by an absolute ceiling (default 30 minutes) to keep mis-configurations from indefinitely starving foreground traffic. LLD locks the exact ceilings and the metric `node_hydration_seconds_total`.
+- **NFR-PERF-3.** Anti-entropy and gossip are **bounded background work**: each is capped at a per-node CPU share (default 5%) and outbound bandwidth share (default 10% of NIC) — both configurable. They MUST NOT pre-empt foreground request budgets. **Hydration-burst exception (A3):** a freshly-rejoined data node (cold restart, post-replacement, or post-reseed) is allowed to run anti-entropy at a **hydration burst budget — default 50% CPU / 50% NIC for up to 10 minutes** before dropping back to steady-state caps. The bursting node tags itself `node_role=hydrating` in gossip so peers throttle their own outbound to it accordingly (avoids the hydrating node DOSing the cluster on its own behalf). Burst budget is configurable per cluster but bounded by an absolute ceiling (default 30 minutes) to keep mis-configurations from indefinitely starving foreground traffic. LLD locks the exact ceilings and the metric `node_hydration_seconds_total`. **Enforcement (DM-2 fix):** the steady-state CPU/NIC caps and the foreground non-preemption guarantee are bench-gated by **`BenchmarkAntiEntropyUnderLoad`** (FR-5); the hydration variant is gated by **`BenchmarkAntiEntropyHydrationBurst`**. Both are GA-blocking — the bench gate (`./.claude/scripts/bench-check.sh`) fails on any of: GET p99 > 1 ms, PUT p99 > 5 ms, anti-entropy CPU share > 5% (steady) / > 50% (burst), outbound NIC share > 10% (steady) / > 50% (burst).
 - **NFR-PERF-4.** Allocations on the hot path: `Get` cache-hit must hit **0 allocations** in steady state (sync.Pool buffers, pre-sized maps).
 
 ### 4.2 Availability & resilience
 
 - **NFR-AVAIL-1.** **Coordinator availability target: 99.95%** (43 m 49 s/month downtime budget). Achieved via 3-node Raft; tolerates 1 of 3 coordinator failures. (§11 Q2.)
-- **NFR-AVAIL-2.** **Data-plane availability target: 99.99%** at `R=ONE` reads, **99.95%** at `R=QUORUM` reads/writes (intra-region). Multi-region availability is best-effort during partitions — the cluster must keep serving in-region traffic during a regional partition (Wiki A10).
+- **NFR-AVAIL-2.** **Data-plane availability target: 99.99%** at `R=ONE` reads, **99.95%** at `R=QUORUM` reads/writes (intra-region). Multi-region availability is best-effort during partitions — the cluster must keep serving in-region traffic during a regional partition (Wiki A10). **Bench-gated by named chaos test (DM-5 fix):** GA-blocked on **`SoakChaosReplicaKill`** (lives in `internal/chaos/soak_chaos_test.go`, `//go:build chaos` build-tag). The test runs **72 hours sustained load** at NFR-SCALE-3 baseline (5-node intra-region cluster, NFR-PERF-1a/1b request mix, ≥ 1M ops/s offered cluster QPS) while a chaos injector kills **a uniformly-random 1-of-5 replica every 5–15 min** (uniform jitter), with a **15 s minimum recovery gap** before the next kill so the cluster does not run permanently below quorum. Per-second error counters are scraped throughout the window. **Pass thresholds (binding GA gate):** `R=ONE` rolling-72h error rate **≤ 0.01%** (= 99.99% availability); `R=QUORUM` rolling-72h error rate **≤ 0.05%** (= 99.95%); no rolling 5-min window above 5× the 72h threshold (catches sustained failure modes that average out). `WRONG_OWNER` redirects, `WRONG_REGION` (where applicable), and timeouts that retry within the SDK's deadline budget are **not** counted as errors; explicit 5xx, deadline-exceeded after retry exhaustion, and any 4xx other than `WRONG_OWNER`/`WRONG_REGION` **are** counted. The test runs pre-tag on `release/*` branches (cost-prohibitive for every PR); a 4-hour smoke variant `SoakChaosReplicaKillSmoke` runs nightly with proportionally-tightened thresholds (≤ 0.005% / ≤ 0.025%) to catch regressions early. Ownership: **QA Lead** owns the test rig + chaos injector; **Project Lead** owns gate wiring; **Architect** signs off on the threshold derivation before HLD freeze.
 - **NFR-AVAIL-3.** **Coordinator failover RTO: < 30 s.** RPO: **0** (Raft commits before ack).
 - **NFR-AVAIL-4.** **Data-node failure**: zero data loss as long as RF (default `N=5`) is honoured. Tolerates up to **2 simultaneous replica failures per range** while still meeting `W=3` / `R=3` (3-of-5 quorum).
 - **NFR-AVAIL-5.** **Rolling upgrades**: zero full-cluster downtime; per-key unavailability bounded to **< 5 s** during the per-node drain window.
@@ -294,6 +298,96 @@ Anchored in `CLAUDE.md`. Every choice below has a one-line rationale.
 - **Coordinator group (3 nodes, Raft).** Owns: cluster membership canonical view, partition map, strategy config, rolling-upgrade orchestration, admin API. **Not on the data path.**
 - **Data node (N ≥ 3).** Owns: a subset of the partition ring, the **in-memory key-value store** (no per-node disk persistence in v1 — see FR-12), the cache layer, the gossip participant, the anti-entropy participant, the client-facing gRPC + Fiber REST surfaces, vector-clock attachment, and conflict resolution. State on a restarting node hydrates via Merkle anti-entropy from peers; durable backstop for full-cluster outage is `gossamerctl snapshot` to the operator-selected backup destination.
 
+#### 6.1.1 System topology diagram
+
+```mermaid
+graph TB
+    subgraph ClientLayer["Client / SDK Layer"]
+        SDK["Smart Go SDK\n(partition-map cache,\nepoch-aware routing,\ntoken-aware gRPC streams)"]
+        REST["REST Callers\n(Fiber, non-Go gRPC)"]
+        L4LB["L4 Load Balancer\n(NLB / k8s Service)"]
+    end
+
+    subgraph CoordGroup["Coordinator Group — 3-node Raft (Control Plane Only)"]
+        C1["Coordinator\nNode 1\n(Leader)"]
+        C2["Coordinator\nNode 2\n(Follower)"]
+        C3["Coordinator\nNode 3\n(Follower)"]
+        C1 <-->|"Raft consensus\n(membership, partition map,\nstrategy config)"| C2
+        C1 <-->|"Raft consensus"| C3
+        C2 <-->|"Raft consensus"| C3
+    end
+
+    subgraph DataPlane["Data Plane — N Data Nodes (default N=5 per range)"]
+        D1["Data Node 1\n(in-memory KV +\ncache + gossip)"]
+        D2["Data Node 2\n(in-memory KV +\ncache + gossip)"]
+        D3["Data Node 3\n(in-memory KV +\ncache + gossip)"]
+        D4["Data Node 4\n(in-memory KV +\ncache + gossip)"]
+        D5["Data Node 5\n(in-memory KV +\ncache + gossip)"]
+    end
+
+    subgraph BackupLayer["Backup Destinations (operator-selected)"]
+        S3["S3-compatible\nobject storage"]
+        PG["PostgreSQL\n(bytea table)"]
+    end
+
+    SDK -->|"direct gRPC (mTLS)\ntier-1 smart routing"| D1
+    SDK -->|"direct gRPC (mTLS)"| D2
+    REST --> L4LB
+    L4LB -->|"any-data-node\ntier-3 fallback"| D1
+    L4LB --> D3
+
+    CoordGroup -->|"gossip: partition map,\nstrategy config,\nregion epoch"| DataPlane
+    DataPlane <-->|"SWIM + Plumtree\ngossip + Merkle\nanti-entropy"| DataPlane
+
+    C1 -->|"Raft snapshots +\npartition-map archive"| S3
+    C1 -->|"Raft snapshots"| PG
+    D1 -->|"gossamerctl snapshot\n(FR-18)"| S3
+    D1 --> PG
+
+    style CoordGroup fill:#e8f4e8,stroke:#4a7c4a
+    style DataPlane fill:#e8f0f8,stroke:#4a6a9c
+    style ClientLayer fill:#fef9e7,stroke:#c9a227
+    style BackupLayer fill:#fdf2f8,stroke:#9b59b6
+```
+
+> **Deployment mode note.** All three deployment modes (local, Kubernetes, multi-region AWS) use the same binary set. In **local** mode all nodes run on one host. In **Kubernetes** mode each group runs as a StatefulSet with headless services. In **multi-region AWS** mode the data-node ring spans regions with region-aware SWIM gossip; passive regions receive async cross-region replication from the primary (FR-21, §6.4).
+
+#### 6.1.2 Coordinator HA / Raft group diagram
+
+```mermaid
+graph LR
+    subgraph RaftGroup["Coordinator Raft Group (3 nodes — tolerates 1 failure)"]
+        direction TB
+        Leader["Coordinator Leader\n• accepts admin API writes\n• broadcasts partition-map updates\n• orchestrates rolling upgrades\n• triggers cross-region failover"]
+        F1["Coordinator Follower 1\n• replicates Raft log\n• can serve read-only admin queries"]
+        F2["Coordinator Follower 2\n• replicates Raft log\n• election candidate"]
+        Leader -->|"AppendEntries RPC\n(mTLS gRPC)"| F1
+        Leader -->|"AppendEntries RPC"| F2
+        F1 & F2 -->|"RequestVote on\nleader loss"| Leader
+    end
+
+    subgraph RaftLog["Raft Commit Log (local SSD/NVMe per node — mandatory)"]
+        LogEntry["Log entry contents:\n• cluster membership deltas\n• partition map versions\n• strategy config changes\n• rolling-upgrade state\n• region epoch bumps"]
+    end
+
+    subgraph SnapshotDest["Raft Snapshot + Archive (operator-selected destination)"]
+        Snap["Snapshot every 10k entries\nor 1 GiB log (whichever first)\n→ s3 or postgres"]
+    end
+
+    subgraph DataPlane2["Data Plane (never on this path)"]
+        DN["Data Nodes\n(foreground reads/writes\ncontinue during coordinator\noutage — control-plane\nmutations pause only)"]
+    end
+
+    RaftGroup -->|"fsync per commit\n(RPO = 0)"| RaftLog
+    RaftGroup -->|"snapshot cadence\n(FR-7)"| SnapshotDest
+    RaftGroup -->|"gossip partition map\n+ strategy config\n(control plane only)"| DataPlane2
+
+    style RaftGroup fill:#e8f4e8,stroke:#4a7c4a
+    style RaftLog fill:#fef9e7,stroke:#c9a227
+    style SnapshotDest fill:#fdf2f8,stroke:#9b59b6
+    style DataPlane2 fill:#e8f0f8,stroke:#4a6a9c
+```
+
 ### 6.2 Request lifecycle (Get / Put)
 
 **Primary path (smart Go SDK, FR-8 tier 1 + FR-20):**
@@ -310,6 +404,67 @@ Anchored in `CLAUDE.md`. Every choice below has a one-line rationale.
 2. If A is one of the 5 owners for the key, A becomes the request coordinator and the flow continues as steps 3–5 above. **One extra hop avoided.**
 3. If A is **not** an owner, A forwards once to a chosen owner B (one extra ~150–300 µs hop), and B becomes the request coordinator. The fallback path therefore costs at most one additional intra-AZ hop relative to the primary path; it is not subject to the GET p99 < 1 ms request-level budget for these callers but is still gated by the per-component bench harness.
 
+#### 6.2.1 Get request lifecycle diagram
+
+```mermaid
+flowchart TD
+    A(["Client / SDK"]) -->|"hash(key) → pick owner\n(1 client-to-cluster hop)"| B{"Epoch\ncurrent?"}
+    B -->|"No — stale epoch"| B1["SDK receives\nWRONG_OWNER\n(epoch=X, owners=[...])"]
+    B1 -->|"re-fetch partition map\nretry once"| B2{"2nd attempt\nWRONG_OWNER?"}
+    B2 -->|"Yes — topology churn"| B3["Fall back to\ntier-3 forwarding\n(partition_map_thrash_total++)"]
+    B2 -->|"No"| C
+    B -->|"Yes"| C["Request-coordinator\nreplica (owns key range)"]
+
+    C --> D{"Cache\nhit?"}
+    D -->|"Hit AND R=ONE"| E["Return cached value\n(p99 < 500 µs sub-budget)"]
+    D -->|"Miss OR R=QUORUM/ALL"| F["Read locally\n+\nParallel reads to\nother 4 owners"]
+
+    F -->|"Fastest 3 responses\n(R=3 of 5)"| G["Cancel slowest 2\nreplica reads"]
+    G --> H["Vector-clock\nreconciliation\n(≤ 100 µs)"]
+    H --> I{"Conflict\nstrategy?"}
+    I -->|"lww"| J["Pick highest\nvector-clock value\n(deterministic total order)"]
+    I -->|"siblings"| K{"Divergent\nvalues?"}
+    K -->|"Yes"| L["Return all siblings\n+ VC contexts\n(NOT cached)"]
+    K -->|"No"| M["Single value\n→ populate cache\n(key, epoch) TTL=100ms"]
+    J --> M
+
+    M --> N(["Return to client\nOTel span closed"])
+    E --> N
+    L --> N
+    B3 --> O["Any-data-node\nforwarding\n(tier-3)"]
+    O --> N
+
+    style E fill:#d5f5e3,stroke:#27ae60
+    style L fill:#fdebd0,stroke:#e67e22
+    style B3 fill:#fdf2f8,stroke:#9b59b6
+```
+
+#### 6.2.2 Put request lifecycle diagram
+
+```mermaid
+flowchart TD
+    A(["Client / SDK"]) -->|"hash(key) → pick owner\n(1 client-to-cluster hop)"| B{"Epoch\ncurrent?"}
+    B -->|"No"| B1["WRONG_OWNER redirect\n→ re-fetch + retry once\n(same as Get path)"]
+    B1 --> C
+    B -->|"Yes"| C["Request-coordinator\nreplica (owns key range)"]
+
+    C --> D["Advance / generate\nper-key vector clock\n(nodeId, counter++)"]
+    D --> E["Write locally\n+\nParallel writes to\nother 4 owners"]
+
+    E -->|"Fastest 3 commits\n(W=3 of 5)"| F["Acknowledge quorum\nCancel pending\nslowest-2 writes"]
+    F --> G["Cache invalidation\n• local in-memory\n• gossip DELETE to\n  Redis cross-instance\n• partition-map epoch\n  bump (auto-invalidates)"]
+    G --> H{"Idempotency\ndedup?"}
+    H -->|"request_id seen\nwithin 5-min window"| I["Return dedup ack\n(no double-write)\nidempotency_persisted=false"]
+    H -->|"new request_id\nor no ID supplied"| J["Write committed\nOTel span closed\n(PUT p99 ≤ 5 ms)"]
+
+    J --> K(["Return to client"])
+    I --> K
+
+    style F fill:#d5f5e3,stroke:#27ae60
+    style G fill:#eaf2ff,stroke:#2980b9
+    style I fill:#fef9e7,stroke:#c9a227
+```
+
 ### 6.3 What the cache layer caches
 
 The cache contract is binding (A1, NFR-PERF-2, FR-12). Both layers below populate from `R=ONE` **and** from successful `R=QUORUM` results, under the same key shape, the same TTL ceiling, and the same invalidation rules — keeping QUORUM reads inside the < 1 ms budget without sacrificing freshness.
@@ -321,6 +476,103 @@ The cache contract is binding (A1, NFR-PERF-2, FR-12). Both layers below populat
 - **The TTL is the worst-case staleness ceiling** for the case where an invalidation message is dropped — explicit invalidation is the primary mechanism, TTL is the safety net.
 
 The HLD must demonstrate that the cache-hit path stays under **1 ms p99** with `b.ReportAllocs()` on a representative payload distribution **at both `R=ONE` and `R=QUORUM`**, or the feature does not ship.
+
+#### 6.3.1 Cache layer and invalidation flow diagram
+
+```mermaid
+flowchart LR
+    subgraph Node["Data Node (per request-coordinator)"]
+        IM["In-memory cache\n(sync.Map)\nkey=(key, epoch)\nTTL default 100ms\nceiling 500ms"]
+    end
+
+    subgraph Shared["Cross-instance cache (Redis)"]
+        RC["Redis\nSame key shape + TTL\nCovers hot keys across\nall data nodes in region"]
+    end
+
+    subgraph Invalidation["Mandatory invalidation paths (NFR-PERF-2)"]
+        I1["Local Put/Delete\n(immediate)"]
+        I2["Gossip DELETE\n(cross-node via SWIM/Plumtree)"]
+        I3["Anti-entropy repair\n(on key touch)"]
+        I4["Partition-map epoch bump\n(automatic — epoch is part of cache key)"]
+    end
+
+    subgraph Eligibility["Cache eligibility rules"]
+        E1["R=ONE result → cacheable"]
+        E2["R=QUORUM result (0 siblings) → cacheable"]
+        E3["siblings mode, divergent → NOT cacheable"]
+    end
+
+    E1 & E2 --> IM
+    E1 & E2 --> RC
+    E3 -.->|"never populates"| IM
+    E3 -.->|"never populates"| RC
+
+    I1 --> IM
+    I2 --> RC
+    I3 --> IM
+    I4 --> IM
+    I4 --> RC
+
+    style E3 fill:#fdebd0,stroke:#e67e22
+    style I4 fill:#eaf2ff,stroke:#2980b9
+```
+
+### 6.4 Active-passive multi-region topology
+
+#### 6.4.1 Multi-region topology diagram
+
+```mermaid
+graph TB
+    subgraph Primary["Primary Region (owns writes)"]
+        PC["Coordinator\nRaft Group (3 nodes)"]
+        PD["Data Nodes\n(N=5 per range)\nin-memory KV"]
+        PR["Redis cache\n(cross-instance)"]
+        PC <-->|"Raft + gossip\npartition map"| PD
+        PD --- PR
+    end
+
+    subgraph Passive1["Passive Region 1 (e.g. EU)"]
+        PC1["Coordinator\n(read-only view\nfollows primary)"]
+        PD1["Data Nodes\n(async replica\nof primary)"]
+        PR1["Redis cache"]
+        PC1 <-->|"gossip"| PD1
+        PD1 --- PR1
+    end
+
+    subgraph Passive2["Passive Region 2 (e.g. APAC)"]
+        PC2["Coordinator\n(read-only view)"]
+        PD2["Data Nodes\n(async replica\nof primary)"]
+        PR2["Redis cache"]
+        PC2 <-->|"gossip"| PD2
+        PD2 --- PR2
+    end
+
+    PD -->|"async replication\nvia SWIM/Plumtree\nlag p99 < 2s\n(FR-21)"| PD1
+    PD -->|"async replication\nlag p99 < 2s"| PD2
+
+    PC -->|"region_epoch\n+ partition-map\nsnapshot"| PC1
+    PC -->|"region_epoch\n+ partition-map\nsnapshot"| PC2
+
+    subgraph SDKBehavior["Smart Go SDK — region routing (FR-20.g)"]
+        SDK2["SDK pins primary\non first call\nWRONG_REGION = recovery only"]
+        SDK2 -->|"writes + QUORUM reads\n→ transparently routed\nto primary (1 cross-region hop)"| Primary
+        SDK2 -->|"ONE reads\n→ served locally\n(~2s stale)"| Passive1
+    end
+
+    subgraph Failover["Manual failover (v1 only — FC-3)"]
+        FO["gossamerctl promote\n--new-primary=eu\n→ fences old primary\nuntil gossamerctl reseed"]
+    end
+
+    style Primary fill:#e8f4e8,stroke:#4a7c4a
+    style Passive1 fill:#e8f0f8,stroke:#4a6a9c
+    style Passive2 fill:#e8f0f8,stroke:#4a6a9c
+    style SDKBehavior fill:#fef9e7,stroke:#c9a227
+    style Failover fill:#fdf2f8,stroke:#9b59b6
+```
+
+> **`cross_region.mode = none` (default):** omit Passive Region boxes entirely — all traffic stays within the single region, no WAN replication, no `WRONG_REGION` errors. Active-active (`FC-3`) is deferred to v1.2.
+
+---
 
 ### 6.5 Data residency model (informational — see NFR-SEC-7)
 
@@ -334,6 +586,99 @@ GossamerDB v1 treats the **cluster as the unit of data residency**, not the key 
 - **FedRAMP / GovCloud** is out of scope for v1; deferred until a sponsoring agency materialises (FC-8).
 
 This section is informational. The binding statements are in NFR-SEC-7 and FR-21.
+
+### 6.6 Rolling upgrade sequence
+
+#### 6.6.1 Rolling upgrade sequence diagram
+
+```mermaid
+sequenceDiagram
+    actor Operator
+    participant gossamerctl
+    participant Coordinator as Coordinator\nRaft Leader
+    participant DN1 as Data Node 1\n(upgrading)
+    participant DN2_N as Data Nodes 2..N\n(running old version)
+    participant HealthGate as Health Gate\n(gossip + admin API)
+
+    Operator->>gossamerctl: gossamerctl rolling-upgrade --version=v1.N+1
+    gossamerctl->>Coordinator: StartRollingUpgrade(target_version)
+    Coordinator->>Coordinator: Record upgrade state in Raft log
+
+    loop For each data node (one at a time)
+        Coordinator->>DN1: Drain(node=DN1)\n(stop accepting new requests)
+        DN1-->>DN2_N: Gossip: "node DN1 draining"
+        Note over DN1,DN2_N: In-flight requests complete\nReplica ownership transfers\nper-key unavailability < 5s (NFR-AVAIL-5)
+        Coordinator->>DN1: Upgrade binary to v1.N+1
+        DN1-->>DN1: Restart with new binary
+        DN1->>HealthGate: Rejoin gossip ring\nReport version=v1.N+1
+        HealthGate->>Coordinator: Health check passed?
+        alt Health gate passes
+            Coordinator->>Coordinator: Mark DN1 upgraded in Raft log
+            Note over Coordinator: Proceed to next node
+        else Health gate fails
+            Coordinator->>Operator: Upgrade halted\n(node unhealthy)
+            Note over Operator: Rollback = repeat loop\nwith previous binary
+        end
+    end
+
+    Coordinator->>gossamerctl: All nodes at v1.N+1
+    gossamerctl-->>Operator: Rolling upgrade complete\nCluster served traffic throughout
+```
+
+> **N / N+1 skew:** during the upgrade window both `v1.N` and `v1.N+1` nodes are live simultaneously — the gossip protocol and wire protocol are backward-compatible within a minor-version window (FR-10, NFR-OPS-3). N / N+2 skew is explicitly rejected (Q12).
+
+### 6.7 mTLS / PKI flow
+
+#### 6.7.1 mTLS / PKI flow diagram
+
+```mermaid
+flowchart TD
+    subgraph CertSource["pki.Source interface — v1 implementations (FR-6)"]
+        DISK["disk source\n• cert/key/CA-bundle paths\n  in cluster YAML\n• fsnotify watches for\n  file changes"]
+        K8S["k8s-secret source\n• references k8s Secret\n  by name\n• watches Secret API\n• cert-manager integrates\n  'for free' here"]
+        DEVPKI["gossamerctl dev-pki\n• one-shot localhost CA\n  + node/admin/client certs\n• local mode ONLY\n  (refuses non-local)"]
+    end
+
+    subgraph SANScheme["SAN identity scheme (cluster name embedded)"]
+        S1["coordinator.<cluster>"]
+        S2["data.<cluster>.<region>"]
+        S3["admin.<cluster>"]
+        S4["client.<cluster>"]
+    end
+
+    subgraph HotReload["Hot-reload contract (zero downtime)"]
+        HR1["New cert detected\n(fsnotify or k8s watch)"]
+        HR2["Reload TLS config\n→ applies at NEXT handshake"]
+        HR3["In-flight TLS sessions\nkeep old credentials\nuntil they close naturally"]
+        HR4["Cert reload event\n→ audit log (FR-16)\nNotBefore / NotAfter / SANs logged"]
+        HR1 --> HR2 --> HR3
+        HR1 --> HR4
+    end
+
+    subgraph Observability["Cert observability"]
+        OBS1["mtls_cert_expires_in_seconds\nPrometheus metric"]
+        OBS2["Grafana panel +\nsample alert rule\n(deploy/observability/)"]
+        OBS1 --> OBS2
+    end
+
+    subgraph Validation["Per-handshake validation"]
+        V1["Mutual cert validation\nagainst trust bundle"]
+        V2["SAN match check:\ncluster name in SAN\nmust match cluster config\n(prevents cross-cluster\ncert reuse)"]
+        V3["Role check:\nadmin.<cluster> → admin API\ndata.<cluster>.* → data-plane\nclient.<cluster> → KV API"]
+        V1 --> V2 --> V3
+    end
+
+    DISK & K8S & DEVPKI --> SANScheme
+    SANScheme --> HotReload
+    SANScheme --> Validation
+    HotReload --> Observability
+
+    style DEVPKI fill:#fdebd0,stroke:#e67e22
+    style Validation fill:#e8f4e8,stroke:#4a7c4a
+    style HotReload fill:#eaf2ff,stroke:#2980b9
+```
+
+> **Built-in CA is permanently rejected** (not deferred) — see FR-6 and Q8. SPIFFE and Vault are deferred to v1.x as additional `pki.Source` implementations (FC-6).
 
 ---
 
@@ -356,6 +701,66 @@ The project follows the GitFlow-inspired model in `CLAUDE.md`. Milestones below 
 | **M11** | Active-passive cross-region replication + manual failover                                                       | 3-region demo (1 primary + 2 passives) with `cross_region.mode=active_passive`: passive `ONE` reads served locally; `QUORUM`/`ALL` returns `WRONG_REGION`; smart SDK transparently retries; **`gossamerctl promote` + `gossamerctl reseed` flip and resync without downtime**; cross-region replication lag p99 < 2 s; `region_role` metric visible in Grafana | M7, M9     |
 | **M12** | Reference observability stack (OTel Collector + Prom + Tempo + Loki + Grafana, docker-compose + Helm sub-chart) | J-O-5 triage SLO met from telemetry alone using the three-panel cross-correlated dashboard; full stack brought up by `docker compose up` in a single command                                                                                                                                                                                                   | M4–M11     |
 | **M13** | v1.0 GA candidate                                                                                               | All NFR targets met; bench gate green; security review passed; rolling-upgrade rehearsal green                                                                                                                                                                                                                                                                 | M3–M12     |
+
+#### 7.1 Milestone dependency DAG
+
+```mermaid
+graph LR
+    M1["M1\nPRD signed off"]
+    M2["M2\nHLD + LLD + Epics\n+ Stories"]
+    M3["M3\nFoundations:\nin-memory store\n+ cache layer"]
+    M4["M4\nSingle-node KV\nmTLS + gRPC + REST"]
+    M5["M5\nCoordinator Raft\n+ partition map"]
+    M6["M6\nGossip SWIM\n+ Plumtree\n+ membership + FD"]
+    M7["M7\nVector clocks\n+ LWW + siblings"]
+    M8["M8\nMerkle anti-entropy\n+ restart hydration"]
+    M9["M9\nBackup destinations\n+ snapshot + restore"]
+    M10["M10\nRolling upgrade\n+ CLI"]
+    M11["M11\nActive-passive\ncross-region\n+ manual failover"]
+    M12["M12\nReference\nobservability stack"]
+    M13["M13\nv1.0 GA candidate"]
+
+    M1 --> M2
+    M2 --> M3
+    M3 --> M4
+    M4 --> M5
+    M4 --> M6
+    M5 --> M7
+    M6 --> M7
+    M7 --> M8
+    M3 --> M9
+    M5 --> M9
+    M5 --> M10
+    M9 --> M10
+    M7 --> M11
+    M9 --> M11
+    M4 --> M12
+    M5 --> M12
+    M6 --> M12
+    M7 --> M12
+    M8 --> M12
+    M9 --> M12
+    M10 --> M12
+    M11 --> M12
+    M3 --> M13
+    M4 --> M13
+    M5 --> M13
+    M6 --> M13
+    M7 --> M13
+    M8 --> M13
+    M9 --> M13
+    M10 --> M13
+    M11 --> M13
+    M12 --> M13
+
+    style M1 fill:#fef9e7,stroke:#c9a227
+    style M13 fill:#d5f5e3,stroke:#27ae60
+    style M3 fill:#eaf2ff,stroke:#2980b9
+    style M7 fill:#eaf2ff,stroke:#2980b9
+    style M11 fill:#fdf2f8,stroke:#9b59b6
+```
+
+> **Critical path:** M1 → M2 → M3 → M4 → M5 → M7 → M8 → M11 → M12 → M13 (10 sequential gates). M6 must complete before M7 and is a parallel workstream with M5.
 
 External dependencies: hashicorp/raft (or etcd raft), gRPC, Fiber, OpenTelemetry SDK, Cobra, AWS SDK (S3 backup destination), Postgres driver (Postgres backup destination). All are well-maintained Go libraries already implied by the stack. **Note:** Pebble drops out of v1's external-dependency list now that the data-node backend is in-memory — it returns in v1.x as the first pluggable durable backend.
 
@@ -388,11 +793,32 @@ GA means **all of**:
 
 - All FR-1..FR-16 implemented with PRD-traceable acceptance tests in `internal/.../*_test.go`.
 - All NFR-PERF / NFR-AVAIL / NFR-SCALE / NFR-SEC targets demonstrated by the system-test rig at the documented numbers.
+- **NFR-AVAIL-2 (Data-plane availability) — DM-5 fix.** GA-blocked on `SoakChaosReplicaKill` (internal/chaos/soak_chaos_test.go, `//go:build chaos`): 72 h sustained NFR-SCALE-3 load with a uniformly-random 1-of-5 replica killed every 5–15 min (15 s min recovery gap). Pass thresholds: `R=ONE` ≤ 0.01% rolling-72h error rate (= 99.99%), `R=QUORUM` ≤ 0.05% (= 99.95%), and no rolling 5-min window above 5× the 72h threshold. `WRONG_OWNER`/`WRONG_REGION` redirects and SDK-internal retries within deadline are not counted as errors. Nightly 4 h smoke variant (`SoakChaosReplicaKillSmoke`) runs with halved thresholds. The full 72 h run gates `release/*` branches pre-tag; smoke run gates the nightly green-build claim.
 - `./scripts/bench-check.sh` green on `develop` for 7 consecutive days at the GA candidate SHA.
 - `golangci-lint run` clean; `go test ./...` green.
 - A 32-node-cluster, 3-region rolling-upgrade rehearsal completes with **zero** data-plane downtime > 5 s per key.
 - A security review of the mTLS posture, audit-log surface, and cert-rotation procedure is signed off by the security persona's reference reviewer.
 - The reference Grafana dashboard answers J-O-5 ("is the cluster healthy / where is the latency / which node is the outlier") on a synthetic outage drill.
+- **J-O-1 (Cluster bring-up time) — DM-1 fix.** GA-gated by three named integration tests, each asserting a wall-clock budget from the **first coordinator `start` invocation** (`t0`) to **all `N` data nodes + all 3 coordinators reporting `Ready=true` via the admin API `GET /v1/cluster/health`** (`t1`); `bring_up_seconds = t1 - t0`. Image-pull policy is **`IfNotPresent` with images pre-pulled** on every host before `t0` (the test harness pre-pulls and asserts `docker image inspect` / `crictl inspect` returns a hit before starting the timer — image-pull time is explicitly excluded from the budget). Hardware baseline is **NFR-SCALE-3** (per-node 4-vCPU / 8 GiB / SSD or NVMe meeting the OD-7 fio floor). Ownership: each test lives under `internal/clusterbringup/<env>_test.go` and is owned by the **Project Lead** (CI wiring) with the **Architect** signing off on the measurement contract before HLD freeze.
+
+  | Env              | Test name                          | Topology                                                  | Budget     | Where it runs                                                                         |
+  | ---------------- | ---------------------------------- | --------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------- |
+  | Local            | `TestClusterBringUpLocal`          | 3 coordinators + 5 data nodes, single host, loopback net  | **60 s**   | Every PR (CI bench-gate stage); fails the gate at > 60 s p95 over 5 consecutive runs. |
+  | Kubernetes       | `TestClusterBringUpK8s`            | 3 coordinators + 5 data nodes, single AZ, kind / k3d      | **3 min**  | Nightly + pre-merge to `develop`; fails at > 3 min p95 over 3 consecutive runs.       |
+  | Multi-region AWS | `TestClusterBringUpMultiRegionAWS` | 3 coordinators + 5 data nodes spread across 3 AWS regions | **10 min** | Pre-tag only (release/* branches); fails at > 10 min p95 over 3 consecutive runs.     |
+
+  All three tests assert the **same readiness contract**: cluster `Ready` ⇔ admin API returns `coordinator_quorum=true ∧ all_data_nodes_alive=true ∧ partition_map_epoch>0 ∧ gossip_converged=true` for two consecutive 5 s polls. The measurement's `t1` is the first poll where the contract holds; `t0` is the timestamp of the first `start` invocation captured by the harness. The PRD-level budget is binding; the LLD MAY tighten it but MUST NOT relax it.
+
+**SHOULD-level FR gate clarification (DM-11 fix):** The following SHOULD-level requirements (§3.2) are **GA-blocking** because their milestones (M11, M12) are prerequisites for M13 per §7:
+
+- **FR-17** (reference observability stack — M12) — GA-blocking.
+- **FR-18** (`gossamerctl snapshot` — M9) — GA-blocking.
+- **FR-20** (Smart Go SDK — required for the GET p99 < 1 ms SLO on the primary path) — GA-blocking.
+- **FR-21** (active-passive cross-region replication — M11) — GA-blocking.
+
+The following SHOULD-level requirement is **GA-aspirational** (may slip to v1.1 without blocking M13):
+
+- **FR-19** (per-cluster rate limits) — may slip to v1.1; missing rate-limits does not break functional correctness of the cluster.
 
 ---
 
@@ -440,12 +866,13 @@ For each of the 20 open questions raised in the wiki §9, the resolution below i
 
 These are the items where I have set a **delivery-realistic default** but the business should confirm before a hard commit. Each has a `needs-by` tag.
 
-- **OD-1. Scale targets exact numbers (Q1).** _Default:_ 128 nodes / 250k ops/s cluster / 5k ops/s node / 1 B keys / 1 MiB value / 1 KiB key. _Why a default:_ the design phase needs concrete partitioning + cache sizing to start. _Needs-by:_ `pre-HLD` (i.e., before the partition / cache design is locked).
+- **OD-1. Scale targets exact numbers (Q1).** ~~_Default:_ 128 nodes / 250k ops/s cluster / 5k ops/s node~~ **Resolved v1.1 (2026-04-28):** superseded by confirmed NFR-SCALE-2/3 — **128 nodes / ≥ 1M ops/s cluster / ≥ 8k ops/s node / 1 B keys / 1 MiB value / 1 KiB key**. See NFR-SCALE-1..8. _Status:_ closed — no further confirmation needed; design phase proceeds on the v1.1 numbers. _(DM-12 fix: removed stale 250k ops/s default that contradicted NFR-SCALE-2.)_
 - **OD-2. Compliance commitment (Q10).** _Resolved 2026-04-29:_ no certifications in v1; SOC2-friendly controls + SOC2 CC-series mapping doc (`docs/security/controls.md`) ship in v1; cluster-level data residency (NFR-SEC-7, §6.5) is the v1 residency primitive. **Public positioning is "audit-ready, not audited."** _Outstanding:_ marketing sign-off on the "audit-ready" wording before public docs go live. _Needs-by:_ `pre-GA`.
 - **OD-3. Multi-region cross-region RTT assumption (Q11/NFR-SCALE-8).** _Default:_ ≤ 100 ms inter-region p99 RTT. _Why a default:_ the cross-region replication lag SLO depends on it. _Needs-by:_ `pre-HLD`.
 - **OD-4. Per-region home-region key allocation policy (Q11).** _Default:_ operator picks home region per key prefix at cluster init; no automatic placement. _Why a default:_ automated placement is a v1.2 active-active concern. _Needs-by:_ `pre-HLD`.
 - **OD-5. Cert overlap window (FR-6 / NFR-SEC-2).** _Default:_ 24 h. _Why a default:_ matches typical operator rotation cadence. _Needs-by:_ `pre-GA`.
-- **OD-6. Bench-gate scope clarification (R1 mitigation).** _Default:_ every benchmark in the repo is tagged as `cache-bound` (gated at 1 ms) or `backend-bound` (not gated). _Why a default:_ prevents false gate failures. _Needs-by:_ `pre-LLD` (must be in the LLD before any Story is sliced).
+- **OD-6. Bench-gate scope clarification (R1 mitigation).** _Default:_ every benchmark in the repo is tagged as `cache-bound` (gated at 1 ms) or `backend-bound` (not gated). _Why a default:_ prevents false gate failures. _Needs-by:_ `pre-HLD` — moved forward from `pre-LLD` because the HLD measurement plan for GET QUORUM p99 (R1 mitigation) depends on knowing which benchmark categories are gate-eligible. _(DM-13 fix: was `pre-LLD`, which is too late for HLD authoring.)_ **Background-work-under-load extension (DM-2 fix):** benchmarks that run a background path (anti-entropy, hydration, gossip) **alongside** foreground load are tagged **`cache-bound`** with respect to the foreground latency assertions (gated at < 1 ms GET p99 / < 5 ms PUT p99) and additionally carry **absolute resource caps** (CPU%, NIC%) that the gate enforces independently of latency. `BenchmarkAntiEntropyUnderLoad` and `BenchmarkAntiEntropyHydrationBurst` (FR-5 / NFR-PERF-3) are the canonical examples; the taxonomy applies to any future bench in this category.
+- **OD-7. Coordinator Raft-log disk IOPS floor (FR-7 — DM-3 fix).** _Default:_ **≥ 3,000 IOPS sustained 4 KiB random write with fsync** per coordinator node, measured with `fio --rw=randwrite --bs=4k --fdatasync=1 --iodepth=1`. _Why a default:_ FR-7 previously deferred the IOPS floor to LLD, which left the SSD/NVMe requirement untestable at GA — the cluster-bootstrap pre-flight (FR-13) needs a concrete number to enforce. The floor accommodates the 10k-entries / 1 GiB snapshot cadence with ≥ 5× headroom for traffic spikes. _Open question for LLD:_ is the floor still adequate when measured against the actual Raft commit-loop fsync hot path under target metadata-mutation rates, or does it need to rise (e.g., to 5–10k IOPS for safety margin against multi-coordinator leader-election storms)? _Needs-by:_ `pre-HLD` for the floor itself (so the HLD bootstrap-pre-flight design can wire it up); `pre-LLD` for any tightening based on measured fsync latency.
 
 ---
 
@@ -460,3 +887,87 @@ These are the items where I have set a **delivery-realistic default** but the bu
   4. `docs/stories/gossamerdb/<epic>/` — implementation stories, ≤ 300 LOC each.
 - **Sign-off:** the full design package (HLD + LLD + Epics + Stories + this PRD) is reviewed end-to-end and the approval date is recorded as `APPROVED: <date>` at the top of this PRD before implementation starts.
 - **Carry-forward SLO:** the **< 1 ms p99 cache-call** budget from `CLAUDE.md` is binding on every cache-bound path the design covers. Bypassing the bench gate is not permitted.
+- **Required v1 GA documentation artifacts** (DM-14, DM-15 fix):
+  - `docs/runbooks/region-failover.md` — step-by-step `gossamerctl promote` + `gossamerctl reseed` procedure with pre-checks, monitoring signals, and success criteria.
+  - `docs/runbooks/cert-rotation.md` — cert rotation procedure for both `disk` and `k8s-secret` PKI sources; includes overlap-window monitoring and verification steps.
+  - `docs/security/controls.md` — SOC2 CC-series mapping (Q10 / OD-2).
+
+  These three documents are GA-blocking deliverables, not optional. Add them to the §9 GA checklist before M13 is declared complete.
+
+---
+
+## 14. Delivery Manager Review — Identified Gaps
+
+The DM review pass identified **20 gaps** total. **12 have been resolved and removed from this section** to keep the open-issues list scannable: **DM-1, DM-2, DM-3, DM-4, DM-5, DM-8, DM-11, DM-12, DM-13, DM-14, DM-15, DM-20** — each resolution is recorded inline in the revision history (v1.7 / v1.8 / v1.9 / v1.10), so the audit trail of _what was found and how it was fixed_ lives there. The **8 entries below remain open** and require resolution before HLD authoring begins (unless noted otherwise). Numbering is preserved (gaps in the sequence are intentional — they correspond to resolved items).
+
+---
+
+### DM-6. FR-19 rate-limit operator-facing configuration is underspecified
+
+**Category:** underspecified-interface
+**Location:** §3.2 FR-19
+**Issue:** FR-19 describes the implementation contract in detail (8-way sharding, per-CPU replenishment) but does not specify the operator-facing configuration API: what config key sets the rate limit, what are the units (ops/s? tokens/s?), is it per-principal or per-cluster, and what is the default (unlimited? some number?). The operator has no way to write a Helm values file for this.
+**Recommended fix:** Add a config-schema snippet to FR-19 showing the YAML/config structure (e.g., `rate_limit.per_principal_ops_per_second: <int>`, `rate_limit.shard_factor: 8`), specify the default value (with rationale), and call out what happens when no limit is configured (pass-through? implicit infinite?).
+
+---
+
+### DM-7. FR-20 Smart Go SDK — no acceptance criterion for primary-region auto-discovery latency
+
+**Category:** missing-AC
+**Location:** §3.2 FR-20.g
+**Issue:** FR-20.g states the SDK "pins all subsequent connections to the primary" after first-call auto-discovery and that `WRONG_REGION` is a "recovery path, not a steady-state path." However, there is no acceptance criterion for how quickly the SDK converges to the primary after a `gossamerctl promote` event, meaning operators have no SLO to hold the SDK to after a failover.
+**Recommended fix:** Add a convergence SLO for post-promote SDK re-pinning (e.g., within 2 × region-epoch propagation window, i.e., ≤ 20 s p99), tie it to the `region_epoch_lag_seconds` metric, and include it in the rolling-upgrade rehearsal gate in §9.
+
+---
+
+### DM-9. Admin API (FR-13) lacks a proto/schema definition or interface contract
+
+**Category:** underspecified-interface
+**Location:** §3.1 FR-13
+**Issue:** FR-13 lists the admin API operations by name (membership inspection, partition map dump, anti-entropy trigger, rolling-upgrade orchestration, strategy change, region promotion, passive reseed) but provides no gRPC service definition, RPC signatures, request/response field list, or error codes. The Architect cannot produce an HLD for this surface without knowing what the caller passes and what the server returns.
+**Recommended fix:** Add a proto-sketch or at minimum a table of `RPC(request) → response | error` for each admin operation before HLD authoring. This does not need to be the final `.proto` file — a table with field names and types is sufficient for the HLD to proceed.
+
+---
+
+### DM-10. `gossamerctl snapshot` (FR-18) restore procedure is "offline" but has no defined RTO
+
+**Category:** missing-AC
+**Location:** §3.2 FR-18
+**Issue:** FR-18 states "Restore is offline" with no target restore time. For disaster-recovery planning, operators need to know the worst-case time to restore a cluster from snapshot (e.g., at 1B keys, 1 MiB values, how long does a full restore + anti-entropy reconcile take?). Without this, R5 (in-memory-only backend blows RAM budget at full-cluster outage) has no measurable DR floor.
+**Recommended fix:** Define a restore RTO target (e.g., cluster reaches `Ready` within 30 min for a 50 GiB snapshot via `s3` on a 32-node cluster) and add a `TestSnapshotRestoreRTO` system test to the M9 exit criterion.
+
+---
+
+### DM-16. No declaration that M6 (gossip) depends on M4 (single-node KV with mTLS) in the dependency table
+
+**Category:** missing-dependency
+**Location:** §7 milestone table row M6
+**Issue:** M6 (Gossip — region-aware SWIM + Plumtree + membership + FD) lists "M4" as its dependency, which is correct — gossip requires a running mTLS-authenticated node. However, M6 also depends implicitly on the gRPC peer-connection primitives introduced in M4, and on the partition-ring data structure introduced in M5. The milestone table shows M6 depends only on M4 but not on M5, while the milestone DAG diagram correctly shows M5 → M7 ← M6. This creates ambiguity about whether M6 can start before M5.
+**Recommended fix:** Clarify in the milestone table that M5 and M6 are parallel workstreams (both depend on M4, neither depends on the other) but that M7 depends on both M5 and M6. Update the M6 "Depends on" cell to read "M4 (M5 in parallel)" to make the parallel scheduling explicit.
+
+---
+
+### DM-17. NFR-SCALE-7 states N ∈ {3, 5} but FR-2 only defines cluster defaults for N=5 — N=3 behavior is unspecified
+
+**Category:** ambiguous-scope
+**Location:** §4.3 NFR-SCALE-7, §3.1 FR-2
+**Issue:** NFR-SCALE-7 states the supported replication factors are N=3 and N=5 (N=1 dropped). FR-2 defines the defaults only for N=5 (W=3, R=3). For N=3, the natural mapping would be W=2, R=2, but this is never stated. An operator deploying a 3-node cluster today has no PRD guidance on what W/R defaults they get, whether the < 1 ms GET p99 SLO applies to N=3 (it may not — 2-of-3 parallel is faster than 3-of-5), and whether the bench gate is calibrated for N=3.
+**Recommended fix:** Add an explicit row to the §4.1 SLO budget table for N=3, and specify the default W/R values for N=3 clusters in FR-2.
+
+---
+
+### DM-18. Partition-ring vnode count is deferred to HLD with no guard rails at PRD level
+
+**Category:** underspecified-interface
+**Location:** §5 Stack decisions table (Partitioning row)
+**Issue:** The stack table states consistent hashing with virtual nodes and notes "Vnode count is fixed in the HLD." The vnode count is a critical design parameter: too few vnodes and rebalancing is coarse; too many and the partition-map gossip message size grows, potentially impacting the < 10 s gossip convergence SLO (NFR-... gossip round-trip). The PRD provides no bounding constraints for the HLD.
+**Recommended fix:** Add a constraint row to the PRD: e.g., "vnode count MUST be chosen such that the serialized partition-map payload fits within X KiB to remain under the gossip message size limit; LLD locks the exact number but the HLD must demonstrate the chosen count satisfies both the rebalancing smoothness requirement and the gossip payload budget."
+
+---
+
+### DM-19. No explicit dependency called out between the Go SDK (FR-20) and the partition-map schema (FR-7/FR-5)
+
+**Category:** missing-dependency
+**Location:** §3.2 FR-20, §3.1 FR-7
+**Issue:** FR-20 states the SDK fetches and caches the partition map, handles epoch changes, and issues `WRONG_OWNER` retries. But there is no explicit cross-reference stating that the partition-map wire schema must be finalized before the SDK can be implemented. If M5 (Coordinator Raft + partition map) completes but the partition-map proto schema is still in flux when M2 (HLD/LLD) is signed off, the SDK implementation in a later milestone will face a moving target.
+**Recommended fix:** Add a note in FR-20 that the partition-map wire schema (field names, epoch semantics, owner-list encoding) is a hard API dependency for the Go SDK and must be locked in the LLD before the SDK story is sliced.
