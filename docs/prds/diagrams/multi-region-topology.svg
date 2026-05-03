@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 760" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11">
+  <title>GossamerDB v1.0 — Active-Passive Multi-Region Topology</title>
+  <desc>One primary region (owns writes) + N passive regions (async replicas). SDK pins primary on first call; QUORUM/ALL reads always go to primary. ONE reads from passive served locally (~2s stale). Manual failover via gossamerctl promote → fences old primary until reseed. Active-active deferred to v1.2.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#444"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2980b9"/>
+    </marker>
+    <marker id="arrow-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#9b59b6"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#27ae60"/>
+    </marker>
+  </defs>
+
+  <text x="640" y="26" text-anchor="middle" font-size="16" font-weight="600" fill="#222">GossamerDB — Active-Passive Multi-Region Topology (§6.4.1)</text>
+  <text x="640" y="46" text-anchor="middle" font-size="11" fill="#666">cross_region.mode=active_passive · primary owns writes · async replication lag p99 &lt; 2 s (FR-21) · v1 manual failover only (FC-3 → v1.2 active-active).</text>
+
+  <!-- SDK box (top center) -->
+  <rect x="380" y="70" width="520" height="100" rx="10" ry="10" fill="#fef9e7" fill-opacity="0.55" stroke="#c9a227" stroke-width="1.5"/>
+  <text x="396" y="90" font-size="12" font-weight="600" fill="#7d6608">Smart Go SDK — region routing (FR-20.g)</text>
+  <text x="640" y="112" text-anchor="middle" font-size="10.5" fill="#5e4b00">SDK pins primary on first call · WRONG_REGION = recovery only</text>
+  <text x="640" y="130" text-anchor="middle" font-size="10.5" fill="#5e4b00">writes + R=QUORUM/ALL → transparently routed to primary (1 cross-region hop)</text>
+  <text x="640" y="148" text-anchor="middle" font-size="10.5" fill="#5e4b00">R=ONE reads → served locally from passive region (~2 s stale)</text>
+  <text x="640" y="164" text-anchor="middle" font-size="10.5" fill="#5e4b00">epoch-aware: WRONG_OWNER + WRONG_REGION handled by single retry handler</text>
+
+  <!-- Primary region (left) -->
+  <rect x="40" y="200" width="380" height="320" rx="12" ry="12" fill="#e8f4e8" fill-opacity="0.55" stroke="#4a7c4a" stroke-width="2"/>
+  <text x="56" y="222" font-size="13" font-weight="700" fill="#1e6b3a">Primary Region — owns writes</text>
+  <text x="56" y="240" font-size="10" fill="#2d5d2d">e.g. us-east-1 · region_role = primary</text>
+
+  <g>
+    <rect x="60" y="260" width="160" height="80" rx="8" ry="8" fill="#d5f5e3" stroke="#27ae60" stroke-width="2"/>
+    <text x="140" y="280" text-anchor="middle" font-weight="700">Coordinator</text>
+    <text x="140" y="297" text-anchor="middle" font-size="10" fill="#1e6b3a">Raft Group (3 nodes)</text>
+    <text x="140" y="313" text-anchor="middle" font-size="10" fill="#1e6b3a">issues partition-map</text>
+    <text x="140" y="329" text-anchor="middle" font-size="10" fill="#1e6b3a">+ region_epoch</text>
+  </g>
+  <g>
+    <rect x="240" y="260" width="160" height="80" rx="8" ry="8" fill="#eafaf1" stroke="#4a7c4a" stroke-width="2"/>
+    <text x="320" y="280" text-anchor="middle" font-weight="700">Data Nodes</text>
+    <text x="320" y="297" text-anchor="middle" font-size="10" fill="#2d5d2d">N=5 per range</text>
+    <text x="320" y="313" text-anchor="middle" font-size="10" fill="#2d5d2d">in-memory KV</text>
+    <text x="320" y="329" text-anchor="middle" font-size="10" fill="#2d5d2d">accept all writes</text>
+  </g>
+  <g>
+    <rect x="60" y="370" width="340" height="60" rx="8" ry="8" fill="#fbeaff" stroke="#9b59b6" stroke-width="1.5"/>
+    <text x="230" y="390" text-anchor="middle" font-weight="600">Redis cache (cross-instance, region-local)</text>
+    <text x="230" y="408" text-anchor="middle" font-size="10" fill="#5b2073">covers hot keys for all data nodes in primary region</text>
+    <text x="230" y="422" text-anchor="middle" font-size="10" fill="#5b2073">invalidated by SWIM/Plumtree gossip on Put/Delete</text>
+  </g>
+  <line x1="220" y1="300" x2="240" y2="300" stroke="#27ae60" stroke-width="1.8" marker-end="url(#arrow-green)"/>
+  <line x1="240" y1="310" x2="220" y2="310" stroke="#27ae60" stroke-width="1.8" marker-end="url(#arrow-green)"/>
+  <line x1="320" y1="340" x2="320" y2="370" stroke="#9b59b6" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
+
+  <text x="230" y="490" text-anchor="middle" font-size="10.5" font-weight="600" fill="#1e6b3a">writes accepted · QUORUM/ALL reads served</text>
+  <text x="230" y="506" text-anchor="middle" font-size="10.5" fill="#1e6b3a">SDK opens direct mTLS gRPC (tier-1 hop)</text>
+
+  <!-- Passive 1 (top-right) -->
+  <rect x="450" y="200" width="380" height="240" rx="12" ry="12" fill="#e8f0f8" fill-opacity="0.45" stroke="#4a6a9c" stroke-width="1.5"/>
+  <text x="466" y="222" font-size="13" font-weight="700" fill="#1f3a68">Passive Region 1 — read-only replica</text>
+  <text x="466" y="240" font-size="10" fill="#1f3a68">e.g. eu-west-1 · region_role = passive</text>
+  <g>
+    <rect x="470" y="260" width="160" height="60" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="550" y="280" text-anchor="middle" font-weight="700">Coordinator</text>
+    <text x="550" y="298" text-anchor="middle" font-size="10" fill="#1f3a68">read-only view</text>
+    <text x="550" y="312" text-anchor="middle" font-size="10" fill="#1f3a68">follows primary</text>
+  </g>
+  <g>
+    <rect x="650" y="260" width="160" height="60" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="730" y="280" text-anchor="middle" font-weight="700">Data Nodes</text>
+    <text x="730" y="298" text-anchor="middle" font-size="10" fill="#1f3a68">async replica</text>
+    <text x="730" y="312" text-anchor="middle" font-size="10" fill="#1f3a68">of primary</text>
+  </g>
+  <g>
+    <rect x="470" y="350" width="340" height="50" rx="8" ry="8" fill="#fbeaff" stroke="#9b59b6" stroke-width="1.5"/>
+    <text x="640" y="370" text-anchor="middle" font-weight="600">Redis cache (region-local)</text>
+    <text x="640" y="388" text-anchor="middle" font-size="10" fill="#5b2073">serves R=ONE hot reads with ~2 s staleness ceiling</text>
+  </g>
+
+  <!-- Passive 2 (bottom-right) -->
+  <rect x="860" y="200" width="380" height="240" rx="12" ry="12" fill="#e8f0f8" fill-opacity="0.45" stroke="#4a6a9c" stroke-width="1.5"/>
+  <text x="876" y="222" font-size="13" font-weight="700" fill="#1f3a68">Passive Region 2 — read-only replica</text>
+  <text x="876" y="240" font-size="10" fill="#1f3a68">e.g. ap-southeast-1 · region_role = passive</text>
+  <g>
+    <rect x="880" y="260" width="160" height="60" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="960" y="280" text-anchor="middle" font-weight="700">Coordinator</text>
+    <text x="960" y="298" text-anchor="middle" font-size="10" fill="#1f3a68">read-only view</text>
+    <text x="960" y="312" text-anchor="middle" font-size="10" fill="#1f3a68">follows primary</text>
+  </g>
+  <g>
+    <rect x="1060" y="260" width="160" height="60" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="1140" y="280" text-anchor="middle" font-weight="700">Data Nodes</text>
+    <text x="1140" y="298" text-anchor="middle" font-size="10" fill="#1f3a68">async replica</text>
+    <text x="1140" y="312" text-anchor="middle" font-size="10" fill="#1f3a68">of primary</text>
+  </g>
+  <g>
+    <rect x="880" y="350" width="340" height="50" rx="8" ry="8" fill="#fbeaff" stroke="#9b59b6" stroke-width="1.5"/>
+    <text x="1050" y="370" text-anchor="middle" font-weight="600">Redis cache (region-local)</text>
+    <text x="1050" y="388" text-anchor="middle" font-size="10" fill="#5b2073">serves R=ONE hot reads with ~2 s staleness ceiling</text>
+  </g>
+
+  <!-- Cross-region replication arrows -->
+  <path d="M 400 300 Q 425 280 470 290" stroke="#2980b9" stroke-width="2" fill="none" marker-end="url(#arrow-blue)"/>
+  <text x="430" y="270" text-anchor="middle" font-size="10" fill="#1f3a68">async replication via SWIM/Plumtree</text>
+  <text x="430" y="282" text-anchor="middle" font-size="10" fill="#1f3a68">lag p99 &lt; 2 s (FR-21)</text>
+
+  <path d="M 400 410 Q 600 470 880 410" stroke="#2980b9" stroke-width="2" fill="none" marker-end="url(#arrow-blue)"/>
+  <text x="640" y="455" text-anchor="middle" font-size="10" fill="#1f3a68">async replication · lag p99 &lt; 2 s</text>
+
+  <!-- region_epoch + map snapshots from coord -->
+  <path d="M 220 260 Q 350 220 470 260" stroke="#27ae60" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)" stroke-dasharray="3 3"/>
+  <text x="345" y="216" text-anchor="middle" font-size="10" fill="#1e6b3a">region_epoch + partition-map snapshot</text>
+  <path d="M 220 260 Q 600 200 880 260" stroke="#27ae60" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)" stroke-dasharray="3 3"/>
+
+  <!-- SDK arrows down -->
+  <path d="M 500 170 Q 400 200 230 260" stroke="#c9a227" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <text x="350" y="195" text-anchor="middle" font-size="10" fill="#7d6608">writes + QUORUM/ALL → primary (1 cross-region hop)</text>
+  <path d="M 760 170 Q 760 195 730 260" stroke="#c9a227" stroke-width="1.5" fill="none" marker-end="url(#arrow)" stroke-dasharray="4 3"/>
+  <text x="800" y="200" text-anchor="middle" font-size="10" fill="#7d6608">R=ONE → local passive</text>
+
+  <!-- Failover panel -->
+  <rect x="40" y="540" width="1200" height="180" rx="10" ry="10" fill="#fdf2f8" fill-opacity="0.55" stroke="#9b59b6" stroke-width="1.5"/>
+  <text x="56" y="562" font-size="12" font-weight="600" fill="#6c2c8c">Manual failover (v1 only — FC-3 deferred to v1.2)</text>
+
+  <g>
+    <rect x="60" y="580" width="320" height="120" rx="8" ry="8" fill="#fbeaff" stroke="#9b59b6" stroke-width="1.5"/>
+    <text x="220" y="602" text-anchor="middle" font-weight="700">gossamerctl promote --new-primary=eu</text>
+    <text x="220" y="622" text-anchor="middle" font-size="10.5" fill="#5b2073">1. fences old primary (writes refuse)</text>
+    <text x="220" y="640" text-anchor="middle" font-size="10.5" fill="#5b2073">2. flips region_role on chosen passive</text>
+    <text x="220" y="658" text-anchor="middle" font-size="10.5" fill="#5b2073">3. bumps region_epoch (SDKs reconverge)</text>
+    <text x="220" y="676" text-anchor="middle" font-size="10.5" fill="#5b2073">4. blocks until reseed restores symmetry</text>
+  </g>
+  <g>
+    <rect x="410" y="580" width="320" height="120" rx="8" ry="8" fill="#fbeaff" stroke="#9b59b6" stroke-width="1.5"/>
+    <text x="570" y="602" text-anchor="middle" font-weight="700">gossamerctl reseed</text>
+    <text x="570" y="622" text-anchor="middle" font-size="10.5" fill="#5b2073">primes the new passive (formerly primary)</text>
+    <text x="570" y="640" text-anchor="middle" font-size="10.5" fill="#5b2073">from new primary's snapshot</text>
+    <text x="570" y="658" text-anchor="middle" font-size="10.5" fill="#5b2073">restores async replication direction</text>
+    <text x="570" y="676" text-anchor="middle" font-size="10.5" fill="#5b2073">unfences and re-enables read traffic</text>
+  </g>
+  <g>
+    <rect x="760" y="580" width="460" height="120" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="990" y="602" text-anchor="middle" font-weight="700">cross_region.mode = none (default)</text>
+    <text x="990" y="622" text-anchor="middle" font-size="10.5" fill="#1f3a68">single-region cluster · no passive boxes · no WAN replication</text>
+    <text x="990" y="640" text-anchor="middle" font-size="10.5" fill="#1f3a68">no WRONG_REGION errors · resident-by-deployment-shape</text>
+    <text x="990" y="660" text-anchor="middle" font-size="10.5" fill="#1f3a68">EU-only / US-only / APAC-only operators get residency</text>
+    <text x="990" y="676" text-anchor="middle" font-size="10.5" fill="#1f3a68">by virtue of region selection (NFR-SEC-7 cluster-as-residency unit)</text>
+  </g>
+</svg>

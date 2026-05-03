@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11">
+  <title>GossamerDB v1.0 — Coordinator HA / Raft Group</title>
+  <desc>3-node Raft group (1 Leader + 2 Followers) backed by a local SSD/NVMe Raft commit log per node, snapshotting to operator-selected destination (S3 / Postgres) every 10k entries or 1 GiB. Coordinator gossips partition map + strategy config to the data plane; data-plane reads/writes never touch this path.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#444"/>
+    </marker>
+    <marker id="arrow-light" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#888"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#27ae60"/>
+    </marker>
+  </defs>
+
+  <text x="640" y="26" text-anchor="middle" font-size="16" font-weight="600" fill="#222">GossamerDB — Coordinator HA / Raft Group (§6.1.2)</text>
+  <text x="640" y="46" text-anchor="middle" font-size="11" fill="#666">Tolerates 1-of-3 failure. RPO=0 via fsync per commit. Data plane keeps serving foreground traffic while control-plane mutations pause.</text>
+
+  <!-- Raft group -->
+  <rect x="40" y="70" width="700" height="280" rx="10" ry="10" fill="#e8f4e8" fill-opacity="0.45" stroke="#4a7c4a" stroke-width="1.5"/>
+  <text x="56" y="92" font-size="12" font-weight="600" fill="#2d5d2d">Coordinator Raft Group (3 nodes — tolerates 1 failure)</text>
+
+  <g>
+    <rect x="80" y="115" width="240" height="200" rx="10" ry="10" fill="#d5f5e3" stroke="#27ae60" stroke-width="2.5"/>
+    <text x="200" y="138" text-anchor="middle" font-weight="700">Coordinator Leader</text>
+    <text x="200" y="162" text-anchor="middle" font-size="10.5" fill="#1e6b3a">• accepts admin API writes</text>
+    <text x="200" y="180" text-anchor="middle" font-size="10.5" fill="#1e6b3a">• broadcasts partition-map updates</text>
+    <text x="200" y="198" text-anchor="middle" font-size="10.5" fill="#1e6b3a">• orchestrates rolling upgrades</text>
+    <text x="200" y="216" text-anchor="middle" font-size="10.5" fill="#1e6b3a">• triggers cross-region failover</text>
+    <text x="200" y="240" text-anchor="middle" font-size="10" fill="#666">Term: monotonic</text>
+    <text x="200" y="256" text-anchor="middle" font-size="10" fill="#666">CommitIndex: monotonic</text>
+    <text x="200" y="272" text-anchor="middle" font-size="10" fill="#666">Heartbeat: 50–150 ms</text>
+  </g>
+
+  <g>
+    <rect x="380" y="115" width="180" height="90" rx="8" ry="8" fill="#eafaf1" stroke="#4a7c4a" stroke-width="1.5"/>
+    <text x="470" y="138" text-anchor="middle" font-weight="600">Follower 1</text>
+    <text x="470" y="158" text-anchor="middle" font-size="10" fill="#2d5d2d">replicates Raft log</text>
+    <text x="470" y="174" text-anchor="middle" font-size="10" fill="#2d5d2d">serves read-only</text>
+    <text x="470" y="190" text-anchor="middle" font-size="10" fill="#2d5d2d">admin queries</text>
+  </g>
+
+  <g>
+    <rect x="380" y="225" width="180" height="90" rx="8" ry="8" fill="#eafaf1" stroke="#4a7c4a" stroke-width="1.5"/>
+    <text x="470" y="248" text-anchor="middle" font-weight="600">Follower 2</text>
+    <text x="470" y="268" text-anchor="middle" font-size="10" fill="#2d5d2d">replicates Raft log</text>
+    <text x="470" y="284" text-anchor="middle" font-size="10" fill="#2d5d2d">election candidate</text>
+    <text x="470" y="300" text-anchor="middle" font-size="10" fill="#2d5d2d">on leader loss</text>
+  </g>
+
+  <!-- AppendEntries arrows -->
+  <line x1="320" y1="155" x2="380" y2="155" stroke="#27ae60" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <text x="345" y="148" text-anchor="middle" font-size="10" fill="#1e6b3a">AppendEntries</text>
+  <line x1="320" y1="265" x2="380" y2="265" stroke="#27ae60" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <text x="345" y="258" text-anchor="middle" font-size="10" fill="#1e6b3a">AppendEntries</text>
+
+  <!-- RequestVote (followers up) -->
+  <path d="M 380 175 Q 350 195 320 195" stroke="#888" stroke-width="1.2" fill="none" marker-end="url(#arrow-light)" stroke-dasharray="3 3"/>
+  <path d="M 380 245 Q 350 220 320 220" stroke="#888" stroke-width="1.2" fill="none" marker-end="url(#arrow-light)" stroke-dasharray="3 3"/>
+  <text x="640" y="170" font-size="10" fill="#666">RequestVote on leader loss (dashed)</text>
+
+  <!-- Right side: Raft Log -->
+  <rect x="780" y="70" width="460" height="195" rx="10" ry="10" fill="#fef9e7" fill-opacity="0.55" stroke="#c9a227" stroke-width="1.5"/>
+  <text x="796" y="92" font-size="12" font-weight="600" fill="#7d6608">Raft Commit Log (local SSD/NVMe per node — mandatory)</text>
+  <g>
+    <rect x="800" y="110" width="420" height="140" rx="8" ry="8" fill="#fffbe6" stroke="#c9a227" stroke-width="1.5"/>
+    <text x="1010" y="130" text-anchor="middle" font-weight="600">Log entry contents</text>
+    <text x="820" y="152" font-size="10.5" fill="#5e4b00">• cluster membership deltas</text>
+    <text x="820" y="170" font-size="10.5" fill="#5e4b00">• partition-map versions</text>
+    <text x="820" y="188" font-size="10.5" fill="#5e4b00">• strategy config changes</text>
+    <text x="820" y="206" font-size="10.5" fill="#5e4b00">• rolling-upgrade state</text>
+    <text x="820" y="224" font-size="10.5" fill="#5e4b00">• region epoch bumps</text>
+    <text x="820" y="244" font-size="10.5" fill="#7d6608">fsync per commit (RPO = 0)</text>
+  </g>
+
+  <!-- Snapshot dest -->
+  <rect x="780" y="285" width="460" height="120" rx="10" ry="10" fill="#fdf2f8" fill-opacity="0.55" stroke="#9b59b6" stroke-width="1.5"/>
+  <text x="796" y="307" font-size="12" font-weight="600" fill="#6c2c8c">Raft Snapshot + Archive (operator-selected)</text>
+  <g>
+    <rect x="800" y="320" width="420" height="75" rx="8" ry="8" fill="#fbeaff" stroke="#9b59b6" stroke-width="1.5"/>
+    <text x="1010" y="342" text-anchor="middle" font-weight="600">Snapshot every 10k entries OR 1 GiB log (first to fire)</text>
+    <text x="1010" y="362" text-anchor="middle" font-size="10.5" fill="#5b2073">Destination: S3-compatible OR PostgreSQL (FR-7 / FR-18)</text>
+    <text x="1010" y="380" text-anchor="middle" font-size="10.5" fill="#5b2073">Same destination drives data-plane KV snapshots</text>
+  </g>
+
+  <!-- Data plane (never on this path) -->
+  <rect x="40" y="430" width="1200" height="180" rx="10" ry="10" fill="#e8f0f8" fill-opacity="0.45" stroke="#4a6a9c" stroke-width="1.5"/>
+  <text x="56" y="452" font-size="12" font-weight="600" fill="#1f3a68">Data Plane (never on the Raft commit path)</text>
+  <g>
+    <rect x="320" y="475" width="640" height="115" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="640" y="498" text-anchor="middle" font-weight="600">Data Nodes — foreground reads/writes</text>
+    <text x="640" y="520" text-anchor="middle" font-size="10.5" fill="#1f3a68">Continue serving traffic during coordinator outage.</text>
+    <text x="640" y="538" text-anchor="middle" font-size="10.5" fill="#1f3a68">Only control-plane mutations (membership change,</text>
+    <text x="640" y="556" text-anchor="middle" font-size="10.5" fill="#1f3a68">strategy config change, rolling upgrade) pause until quorum returns.</text>
+    <text x="640" y="578" text-anchor="middle" font-size="10.5" fill="#1f3a68">Existing partition map keeps routing requests; gossip continues.</text>
+  </g>
+
+  <!-- Edges from RaftGroup → Log -->
+  <path d="M 740 165 Q 770 165 800 165" stroke="#c9a227" stroke-width="1.5" fill="none" marker-end="url(#arrow-light)"/>
+  <text x="745" y="155" font-size="10" fill="#7d6608">fsync</text>
+
+  <!-- Log → Snapshot -->
+  <path d="M 1010 250 Q 1010 270 1010 320" stroke="#9b59b6" stroke-width="1.5" fill="none" marker-end="url(#arrow-light)"/>
+  <text x="1020" y="280" font-size="10" fill="#6c2c8c">snapshot cadence (FR-7)</text>
+
+  <!-- Raft → Data plane (gossip control plane) -->
+  <path d="M 200 315 Q 200 400 500 475" stroke="#4a7c4a" stroke-width="1.5" fill="none" marker-end="url(#arrow-light)" stroke-dasharray="4 3"/>
+  <text x="60" y="395" font-size="10" fill="#2d5d2d">gossip partition map</text>
+  <text x="60" y="408" font-size="10" fill="#2d5d2d">+ strategy config</text>
+  <text x="60" y="421" font-size="10" fill="#2d5d2d">(control plane only)</text>
+</svg>

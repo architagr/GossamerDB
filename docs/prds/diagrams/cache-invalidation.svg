@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 680" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11">
+  <title>GossamerDB v1.0 — Cache Layer &amp; Invalidation Flow</title>
+  <desc>Two-tier cache (in-process sync.Map + Redis cross-instance) keyed by (key, partition_map_epoch). Cacheable: R=ONE results and R=QUORUM single-value results. Divergent siblings are NEVER cached. Mandatory invalidation paths: local Put/Delete, gossip DELETE, anti-entropy repair, partition-map epoch bump.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#444"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2980b9"/>
+    </marker>
+    <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#e67e22"/>
+    </marker>
+    <marker id="arrow-light" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#888"/>
+    </marker>
+  </defs>
+
+  <text x="640" y="26" text-anchor="middle" font-size="16" font-weight="600" fill="#222">GossamerDB — Cache Layer &amp; Invalidation Flow (§6.3.1)</text>
+  <text x="640" y="46" text-anchor="middle" font-size="11" fill="#666">Cache key = (key, partition_map_epoch). Default TTL 100 ms · ceiling 500 ms. Explicit invalidation primary; TTL is the dropped-message safety net.</text>
+
+  <!-- Eligibility (left) -->
+  <rect x="40" y="80" width="320" height="280" rx="10" ry="10" fill="#fef9e7" fill-opacity="0.55" stroke="#c9a227" stroke-width="1.5"/>
+  <text x="56" y="102" font-size="12" font-weight="600" fill="#7d6608">Cache eligibility rules</text>
+  <g>
+    <rect x="60" y="120" width="280" height="60" rx="8" ry="8" fill="#d5f5e3" stroke="#27ae60" stroke-width="1.5"/>
+    <text x="200" y="140" text-anchor="middle" font-weight="600">R=ONE result → cacheable</text>
+    <text x="200" y="158" text-anchor="middle" font-size="10" fill="#1e6b3a">single-replica read · always single value</text>
+    <text x="200" y="172" text-anchor="middle" font-size="10" fill="#1e6b3a">populates both tiers</text>
+  </g>
+  <g>
+    <rect x="60" y="190" width="280" height="60" rx="8" ry="8" fill="#d5f5e3" stroke="#27ae60" stroke-width="1.5"/>
+    <text x="200" y="210" text-anchor="middle" font-weight="600">R=QUORUM, 0 siblings → cacheable</text>
+    <text x="200" y="228" text-anchor="middle" font-size="10" fill="#1e6b3a">3-of-5 winners reconciled to single value</text>
+    <text x="200" y="242" text-anchor="middle" font-size="10" fill="#1e6b3a">VC convergence verified</text>
+  </g>
+  <g>
+    <rect x="60" y="265" width="280" height="80" rx="8" ry="8" fill="#fdebd0" stroke="#e67e22" stroke-width="2"/>
+    <text x="200" y="285" text-anchor="middle" font-weight="700">siblings, divergent → NOT cached</text>
+    <text x="200" y="303" text-anchor="middle" font-size="10" fill="#7d3c00">caller must read-and-resolve;</text>
+    <text x="200" y="319" text-anchor="middle" font-size="10" fill="#7d3c00">caching would freeze a fork.</text>
+    <text x="200" y="335" text-anchor="middle" font-size="10" fill="#7d3c00">never populates either tier.</text>
+  </g>
+
+  <!-- Cache tiers (center) -->
+  <rect x="420" y="80" width="440" height="280" rx="10" ry="10" fill="#e8f0f8" fill-opacity="0.45" stroke="#4a6a9c" stroke-width="1.5"/>
+  <text x="436" y="102" font-size="12" font-weight="600" fill="#1f3a68">Cache tiers</text>
+
+  <g>
+    <rect x="440" y="120" width="180" height="220" rx="10" ry="10" fill="#eaf2ff" stroke="#2980b9" stroke-width="2"/>
+    <text x="530" y="142" text-anchor="middle" font-weight="700">In-memory</text>
+    <text x="530" y="160" text-anchor="middle" font-size="10" fill="#1f3a68">sync.Map-backed</text>
+    <text x="530" y="176" text-anchor="middle" font-size="10" fill="#1f3a68">in-process per data node</text>
+    <text x="530" y="200" text-anchor="middle" font-size="10" fill="#1f3a68">key=(key, epoch)</text>
+    <text x="530" y="218" text-anchor="middle" font-size="10" fill="#1f3a68">TTL 100 ms (default)</text>
+    <text x="530" y="234" text-anchor="middle" font-size="10" fill="#1f3a68">ceiling 500 ms</text>
+    <text x="530" y="262" text-anchor="middle" font-size="10" fill="#1f3a68">single-instance scope</text>
+    <text x="530" y="278" text-anchor="middle" font-size="10" fill="#1f3a68">zero-alloc lookup</text>
+    <text x="530" y="306" text-anchor="middle" font-size="10.5" font-weight="600" fill="#1f3a68">cache-bound</text>
+    <text x="530" y="322" text-anchor="middle" font-size="10.5" font-weight="600" fill="#1f3a68">p99 &lt; 500 µs</text>
+  </g>
+
+  <g>
+    <rect x="660" y="120" width="180" height="220" rx="10" ry="10" fill="#fbeaff" stroke="#9b59b6" stroke-width="2"/>
+    <text x="750" y="142" text-anchor="middle" font-weight="700">Redis</text>
+    <text x="750" y="160" text-anchor="middle" font-size="10" fill="#5b2073">cross-instance</text>
+    <text x="750" y="178" text-anchor="middle" font-size="10" fill="#5b2073">covers hot keys served</text>
+    <text x="750" y="192" text-anchor="middle" font-size="10" fill="#5b2073">by any data node in region</text>
+    <text x="750" y="216" text-anchor="middle" font-size="10" fill="#5b2073">same key shape + TTL</text>
+    <text x="750" y="232" text-anchor="middle" font-size="10" fill="#5b2073">as in-memory tier</text>
+    <text x="750" y="258" text-anchor="middle" font-size="10" fill="#5b2073">invalidation propagated</text>
+    <text x="750" y="274" text-anchor="middle" font-size="10" fill="#5b2073">via gossip on Put/Delete</text>
+    <text x="750" y="306" text-anchor="middle" font-size="10.5" font-weight="600" fill="#5b2073">covers re-routed</text>
+    <text x="750" y="322" text-anchor="middle" font-size="10.5" font-weight="600" fill="#5b2073">requests post-failover</text>
+  </g>
+
+  <!-- Eligibility → cache arrows -->
+  <line x1="340" y1="150" x2="438" y2="180" stroke="#27ae60" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <line x1="340" y1="150" x2="658" y2="180" stroke="#27ae60" stroke-width="1.5" marker-end="url(#arrow)" stroke-dasharray="4 3"/>
+  <line x1="340" y1="220" x2="438" y2="220" stroke="#27ae60" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <line x1="340" y1="220" x2="658" y2="220" stroke="#27ae60" stroke-width="1.5" marker-end="url(#arrow)" stroke-dasharray="4 3"/>
+
+  <!-- siblings ✗ -->
+  <line x1="340" y1="305" x2="438" y2="305" stroke="#e67e22" stroke-width="1.5" marker-end="url(#arrow-orange)" stroke-dasharray="2 4"/>
+  <text x="385" y="298" text-anchor="middle" font-size="10" fill="#a85a16">never</text>
+  <line x1="340" y1="305" x2="658" y2="305" stroke="#e67e22" stroke-width="1.5" marker-end="url(#arrow-orange)" stroke-dasharray="2 4"/>
+
+  <!-- Right: Invalidation paths -->
+  <rect x="900" y="80" width="340" height="280" rx="10" ry="10" fill="#fdf2f8" fill-opacity="0.55" stroke="#9b59b6" stroke-width="1.5"/>
+  <text x="916" y="102" font-size="12" font-weight="600" fill="#6c2c8c">Mandatory invalidation paths (NFR-PERF-2)</text>
+  <g>
+    <rect x="920" y="120" width="300" height="50" rx="8" ry="8" fill="#fbeaff" stroke="#9b59b6" stroke-width="1.5"/>
+    <text x="1070" y="138" text-anchor="middle" font-weight="600">Local Put / Delete</text>
+    <text x="1070" y="155" text-anchor="middle" font-size="10" fill="#5b2073">immediate · in-process</text>
+  </g>
+  <g>
+    <rect x="920" y="180" width="300" height="50" rx="8" ry="8" fill="#fbeaff" stroke="#9b59b6" stroke-width="1.5"/>
+    <text x="1070" y="198" text-anchor="middle" font-weight="600">Gossip DELETE</text>
+    <text x="1070" y="215" text-anchor="middle" font-size="10" fill="#5b2073">SWIM/Plumtree → Redis</text>
+  </g>
+  <g>
+    <rect x="920" y="240" width="300" height="50" rx="8" ry="8" fill="#fbeaff" stroke="#9b59b6" stroke-width="1.5"/>
+    <text x="1070" y="258" text-anchor="middle" font-weight="600">Anti-entropy repair</text>
+    <text x="1070" y="275" text-anchor="middle" font-size="10" fill="#5b2073">on key touch · Merkle</text>
+  </g>
+  <g>
+    <rect x="920" y="300" width="300" height="50" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="2"/>
+    <text x="1070" y="318" text-anchor="middle" font-weight="700">Partition-map epoch bump</text>
+    <text x="1070" y="335" text-anchor="middle" font-size="10" fill="#1f3a68">automatic — epoch is part of cache key</text>
+  </g>
+
+  <!-- Invalidation arrows back to cache -->
+  <line x1="918" y1="145" x2="620" y2="190" stroke="#9b59b6" stroke-width="1.5" marker-end="url(#arrow-light)"/>
+  <line x1="918" y1="205" x2="840" y2="225" stroke="#9b59b6" stroke-width="1.5" marker-end="url(#arrow-light)"/>
+  <line x1="918" y1="265" x2="620" y2="240" stroke="#9b59b6" stroke-width="1.5" marker-end="url(#arrow-light)"/>
+  <line x1="918" y1="320" x2="620" y2="290" stroke="#2980b9" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <line x1="918" y1="320" x2="840" y2="290" stroke="#2980b9" stroke-width="2" marker-end="url(#arrow-blue)"/>
+
+  <!-- Bottom note panel -->
+  <rect x="40" y="400" width="1200" height="240" rx="8" ry="8" fill="#fafafa" stroke="#ccc" stroke-width="1"/>
+  <text x="60" y="425" font-size="12" font-weight="600" fill="#333">Why these rules?</text>
+  <text x="60" y="447" font-size="11" fill="#444">• Vector-clock-hash in cache key would change on every write — defeats the cache under hot-key traffic (NFR-SCALE-3a, 1k QPS / key).</text>
+  <text x="60" y="465" font-size="11" fill="#444">• `(key, epoch)` invalidates the whole tier on map churn — no per-key sweep needed when ownership shifts.</text>
+  <text x="60" y="483" font-size="11" fill="#444">• Both tiers populate from R=ONE AND from successful R=QUORUM under same TTL — keeps QUORUM reads inside &lt; 1 ms budget without sacrificing freshness.</text>
+  <text x="60" y="501" font-size="11" fill="#444">• Sibling results are caller-merge contracts — caching them risks freezing one branch of the fork.</text>
+  <text x="60" y="525" font-size="12" font-weight="600" fill="#333">Bench gate (HLD must demonstrate):</text>
+  <text x="60" y="547" font-size="11" fill="#444">• cache-hit path stays under 1 ms p99 with `b.ReportAllocs()` on representative payload distribution at BOTH R=ONE AND R=QUORUM, or feature does not ship.</text>
+  <text x="60" y="565" font-size="11" fill="#444">• `BenchmarkGetCacheHit_ROne` and `BenchmarkGetCacheHit_RQuorum` are both required harness entries (LLD-defined taxonomy).</text>
+  <text x="60" y="589" font-size="12" font-weight="600" fill="#333">TTL semantics:</text>
+  <text x="60" y="611" font-size="11" fill="#444">• Default 100 ms / ceiling 500 ms = worst-case staleness window if an invalidation message is dropped.</text>
+  <text x="60" y="629" font-size="11" fill="#444">• Explicit invalidation is the primary mechanism. TTL is the safety net for gossip / network drops.</text>
+</svg>

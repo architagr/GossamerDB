@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 920" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11">
+  <title>GossamerDB v1.0 — Get Request Lifecycle</title>
+  <desc>Get path: SDK hashes the key, opens an mTLS gRPC stream to a request-coordinator replica, validates partition-map epoch, checks cache, falls through to fastest-3-of-5 quorum read, reconciles via vector clocks, applies lww or siblings strategy, populates cache, returns. Stale-epoch SDK gets WRONG_OWNER and retries once; second WRONG_OWNER falls back to tier-3 forwarding.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#444"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2980b9"/>
+    </marker>
+    <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#e67e22"/>
+    </marker>
+    <marker id="arrow-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#9b59b6"/>
+    </marker>
+  </defs>
+
+  <text x="640" y="26" text-anchor="middle" font-size="16" font-weight="600" fill="#222">GossamerDB — Get Request Lifecycle (§6.2.1)</text>
+  <text x="640" y="46" text-anchor="middle" font-size="11" fill="#666">SLO: GET p99 &lt; 1 ms (cache-bound &lt; 500 µs sub-budget · QUORUM fan-out budget = ≤ 50 µs dispatch + ≤ 600 µs slowest-of-3 RTT + ≤ 100 µs reconcile + ≤ 50 µs marshal).</text>
+
+  <!-- Client -->
+  <g>
+    <ellipse cx="640" cy="90" rx="100" ry="22" fill="#fffbe6" stroke="#c9a227" stroke-width="1.5"/>
+    <text x="640" y="94" text-anchor="middle" font-weight="700">Client / SDK</text>
+  </g>
+
+  <!-- Step 1: hash key, open stream -->
+  <line x1="640" y1="112" x2="640" y2="148" stroke="#444" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="650" y="135" font-size="10" fill="#444">hash(key) → pick owner · 1 client→cluster hop</text>
+
+  <!-- Decision: Epoch current? -->
+  <polygon points="640,150 760,200 640,250 520,200" fill="#f5f5f5" stroke="#666" stroke-width="1.5"/>
+  <text x="640" y="195" text-anchor="middle" font-weight="600">Epoch</text>
+  <text x="640" y="212" text-anchor="middle" font-weight="600">current?</text>
+
+  <!-- No path: WRONG_OWNER -->
+  <line x1="520" y1="200" x2="320" y2="200" stroke="#e67e22" stroke-width="2" marker-end="url(#arrow-orange)"/>
+  <text x="420" y="190" text-anchor="middle" font-size="10" fill="#a85a16">No — stale epoch</text>
+  <g>
+    <rect x="120" y="170" width="200" height="60" rx="8" ry="8" fill="#fdebd0" stroke="#e67e22" stroke-width="1.5"/>
+    <text x="220" y="190" text-anchor="middle" font-weight="600">WRONG_OWNER</text>
+    <text x="220" y="208" text-anchor="middle" font-size="10" fill="#7d3c00">epoch=X, owners=[...]</text>
+    <text x="220" y="222" text-anchor="middle" font-size="10" fill="#7d3c00">SDK refreshes map · retries 1x</text>
+  </g>
+
+  <line x1="220" y1="230" x2="220" y2="280" stroke="#e67e22" stroke-width="2" marker-end="url(#arrow-orange)"/>
+
+  <polygon points="220,285 320,335 220,385 120,335" fill="#f5f5f5" stroke="#666" stroke-width="1.5"/>
+  <text x="220" y="330" text-anchor="middle" font-weight="600">2nd attempt</text>
+  <text x="220" y="346" text-anchor="middle" font-weight="600">WRONG_OWNER?</text>
+
+  <!-- Yes 2nd → tier-3 fallback -->
+  <line x1="220" y1="385" x2="220" y2="430" stroke="#9b59b6" stroke-width="2" marker-end="url(#arrow-purple)"/>
+  <text x="230" y="412" font-size="10" fill="#5b2073">Yes — topology churn</text>
+  <g>
+    <rect x="80" y="430" width="280" height="65" rx="8" ry="8" fill="#fbeaff" stroke="#9b59b6" stroke-width="1.5"/>
+    <text x="220" y="452" text-anchor="middle" font-weight="600">Tier-3 forwarding</text>
+    <text x="220" y="470" text-anchor="middle" font-size="10" fill="#5b2073">L4 LB → any-data-node</text>
+    <text x="220" y="485" text-anchor="middle" font-size="10" fill="#5b2073">partition_map_thrash_total++</text>
+  </g>
+
+  <!-- No 2nd → continue main flow -->
+  <line x1="320" y1="335" x2="500" y2="335" stroke="#444" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="410" y="325" text-anchor="middle" font-size="10" fill="#444">No</text>
+
+  <!-- Main path: Yes → Coordinator replica -->
+  <line x1="640" y1="250" x2="640" y2="300" stroke="#444" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="650" y="285" font-size="10" fill="#444">Yes</text>
+  <g>
+    <rect x="500" y="305" width="280" height="60" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="640" y="328" text-anchor="middle" font-weight="700">Request-coordinator replica</text>
+    <text x="640" y="346" text-anchor="middle" font-size="10" fill="#1f3a68">owns key range · gossip-current map</text>
+    <text x="640" y="360" text-anchor="middle" font-size="10" fill="#1f3a68">opens / reuses mTLS gRPC stream</text>
+  </g>
+
+  <line x1="640" y1="365" x2="640" y2="400" stroke="#444" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Cache hit decision -->
+  <polygon points="640,400 760,450 640,500 520,450" fill="#f5f5f5" stroke="#666" stroke-width="1.5"/>
+  <text x="640" y="445" text-anchor="middle" font-weight="600">Cache</text>
+  <text x="640" y="461" text-anchor="middle" font-weight="600">hit?</text>
+
+  <!-- Hit AND R=ONE -->
+  <line x1="760" y1="450" x2="940" y2="450" stroke="#27ae60" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="850" y="440" text-anchor="middle" font-size="10" fill="#1e6b3a">Hit AND R=ONE</text>
+  <g>
+    <rect x="940" y="420" width="280" height="60" rx="8" ry="8" fill="#d5f5e3" stroke="#27ae60" stroke-width="2"/>
+    <text x="1080" y="442" text-anchor="middle" font-weight="700">Return cached value</text>
+    <text x="1080" y="460" text-anchor="middle" font-size="10" fill="#1e6b3a">cache-bound p99 &lt; 500 µs</text>
+    <text x="1080" y="474" text-anchor="middle" font-size="10" fill="#1e6b3a">key=(key, partition_map_epoch)</text>
+  </g>
+
+  <!-- Miss / QUORUM/ALL -->
+  <line x1="640" y1="500" x2="640" y2="540" stroke="#444" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="660" y="525" font-size="10" fill="#444">Miss OR R=QUORUM/ALL</text>
+
+  <g>
+    <rect x="430" y="545" width="420" height="80" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="640" y="567" text-anchor="middle" font-weight="700">Read locally + parallel reads to other 4 owners</text>
+    <text x="640" y="586" text-anchor="middle" font-size="10" fill="#1f3a68">5 owners total · warm gRPC pool · zero-alloc dispatch</text>
+    <text x="640" y="602" text-anchor="middle" font-size="10" fill="#1f3a68">return on fastest 3 responses (R=3 of 5) · cancel slowest 2</text>
+    <text x="640" y="618" text-anchor="middle" font-size="10" fill="#1f3a68">budget: ≤ 50 µs dispatch + ≤ 600 µs intra-AZ RTT</text>
+  </g>
+
+  <line x1="640" y1="625" x2="640" y2="665" stroke="#444" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <g>
+    <rect x="490" y="665" width="300" height="50" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="640" y="685" text-anchor="middle" font-weight="700">Vector-clock reconciliation</text>
+    <text x="640" y="702" text-anchor="middle" font-size="10" fill="#1f3a68">≤ 100 µs · NFR-PERF-4 zero-alloc</text>
+  </g>
+
+  <line x1="640" y1="715" x2="640" y2="745" stroke="#444" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Conflict strategy -->
+  <polygon points="640,745 770,790 640,835 510,790" fill="#f5f5f5" stroke="#666" stroke-width="1.5"/>
+  <text x="640" y="785" text-anchor="middle" font-weight="600">Conflict</text>
+  <text x="640" y="800" text-anchor="middle" font-weight="600">strategy?</text>
+
+  <!-- lww left -->
+  <line x1="510" y1="790" x2="370" y2="790" stroke="#444" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="440" y="780" text-anchor="middle" font-size="10" fill="#444">lww</text>
+  <g>
+    <rect x="100" y="760" width="270" height="60" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="235" y="782" text-anchor="middle" font-weight="600">Pick highest VC value</text>
+    <text x="235" y="800" text-anchor="middle" font-size="10" fill="#1f3a68">deterministic total order</text>
+    <text x="235" y="814" text-anchor="middle" font-size="10" fill="#1f3a68">populate cache (TTL 100 ms, ceiling 500 ms)</text>
+  </g>
+
+  <!-- siblings right -->
+  <line x1="770" y1="790" x2="910" y2="790" stroke="#e67e22" stroke-width="2" marker-end="url(#arrow-orange)"/>
+  <text x="840" y="780" text-anchor="middle" font-size="10" fill="#a85a16">siblings</text>
+  <g>
+    <rect x="910" y="760" width="270" height="60" rx="8" ry="8" fill="#fdebd0" stroke="#e67e22" stroke-width="1.5"/>
+    <text x="1045" y="782" text-anchor="middle" font-weight="600">Return all siblings + VC contexts</text>
+    <text x="1045" y="800" text-anchor="middle" font-size="10" fill="#7d3c00">divergent values NOT cached</text>
+    <text x="1045" y="814" text-anchor="middle" font-size="10" fill="#7d3c00">caller merges and re-Puts</text>
+  </g>
+
+  <!-- Convergence to return -->
+  <line x1="235" y1="820" x2="235" y2="868" stroke="#444" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="1045" y1="820" x2="1045" y2="868" stroke="#444" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="1080" y1="480" x2="1080" y2="868" stroke="#27ae60" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="4 3"/>
+  <line x1="220" y1="495" x2="220" y2="868" stroke="#9b59b6" stroke-width="2" marker-end="url(#arrow-purple)" stroke-dasharray="4 3"/>
+
+  <ellipse cx="640" cy="880" rx="160" ry="22" fill="#fffbe6" stroke="#c9a227" stroke-width="1.5"/>
+  <text x="640" y="876" text-anchor="middle" font-weight="700">Return to client</text>
+  <text x="640" y="891" text-anchor="middle" font-size="10" fill="#7d6608">OTel span closed · gRPC trailers carry VC context</text>
+
+  <line x1="370" y1="880" x2="478" y2="880" stroke="#444" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="910" y1="880" x2="800" y2="880" stroke="#444" stroke-width="2" marker-end="url(#arrow)"/>
+</svg>

@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 880" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11">
+  <title>GossamerDB v1.0 — Put Request Lifecycle</title>
+  <desc>Put path: SDK hashes the key, opens an mTLS gRPC stream to the request-coordinator replica, advances the per-key vector clock, fans out to the other 4 owners, ack-s on fastest 3 commits, invalidates cache (local + Redis cross-instance + epoch-bump), checks idempotency dedup window, returns. PUT p99 ≤ 5 ms.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#444"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2980b9"/>
+    </marker>
+    <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#e67e22"/>
+    </marker>
+  </defs>
+
+  <text x="640" y="26" text-anchor="middle" font-size="16" font-weight="600" fill="#222">GossamerDB — Put Request Lifecycle (§6.2.2)</text>
+  <text x="640" y="46" text-anchor="middle" font-size="11" fill="#666">SLO: PUT p99 ≤ 5 ms · W=3 of 5 quorum · idempotency dedup window = 5 min · cache invalidation is mandatory (NFR-PERF-2).</text>
+
+  <!-- Client -->
+  <g>
+    <ellipse cx="640" cy="90" rx="100" ry="22" fill="#fffbe6" stroke="#c9a227" stroke-width="1.5"/>
+    <text x="640" y="94" text-anchor="middle" font-weight="700">Client / SDK</text>
+  </g>
+
+  <line x1="640" y1="112" x2="640" y2="148" stroke="#444" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="650" y="135" font-size="10" fill="#444">hash(key) → pick owner · 1 client→cluster hop</text>
+
+  <!-- Decision: epoch -->
+  <polygon points="640,150 760,200 640,250 520,200" fill="#f5f5f5" stroke="#666" stroke-width="1.5"/>
+  <text x="640" y="195" text-anchor="middle" font-weight="600">Epoch</text>
+  <text x="640" y="212" text-anchor="middle" font-weight="600">current?</text>
+
+  <!-- No → wrong owner shortcut -->
+  <line x1="520" y1="200" x2="320" y2="200" stroke="#e67e22" stroke-width="2" marker-end="url(#arrow-orange)"/>
+  <text x="420" y="190" text-anchor="middle" font-size="10" fill="#a85a16">No</text>
+  <g>
+    <rect x="100" y="170" width="220" height="60" rx="8" ry="8" fill="#fdebd0" stroke="#e67e22" stroke-width="1.5"/>
+    <text x="210" y="190" text-anchor="middle" font-weight="600">WRONG_OWNER redirect</text>
+    <text x="210" y="208" text-anchor="middle" font-size="10" fill="#7d3c00">re-fetch map · retry 1x</text>
+    <text x="210" y="222" text-anchor="middle" font-size="10" fill="#7d3c00">(same as Get path)</text>
+  </g>
+  <path d="M 210 230 Q 210 290 510 305" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arrow-orange)"/>
+
+  <!-- Yes path -->
+  <line x1="640" y1="250" x2="640" y2="300" stroke="#444" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="650" y="285" font-size="10" fill="#444">Yes</text>
+  <g>
+    <rect x="500" y="305" width="280" height="60" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="640" y="328" text-anchor="middle" font-weight="700">Request-coordinator replica</text>
+    <text x="640" y="346" text-anchor="middle" font-size="10" fill="#1f3a68">owns key range · gossip-current map</text>
+    <text x="640" y="360" text-anchor="middle" font-size="10" fill="#1f3a68">opens / reuses mTLS gRPC stream</text>
+  </g>
+
+  <line x1="640" y1="365" x2="640" y2="400" stroke="#444" stroke-width="2" marker-end="url(#arrow)"/>
+  <g>
+    <rect x="470" y="400" width="340" height="60" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="640" y="422" text-anchor="middle" font-weight="700">Advance / generate per-key vector clock</text>
+    <text x="640" y="440" text-anchor="middle" font-size="10" fill="#1f3a68">(nodeId, counter++) · zero-alloc (NFR-PERF-4)</text>
+    <text x="640" y="454" text-anchor="middle" font-size="10" fill="#1f3a68">VC context attached as gRPC metadata</text>
+  </g>
+
+  <line x1="640" y1="460" x2="640" y2="500" stroke="#444" stroke-width="2" marker-end="url(#arrow)"/>
+  <g>
+    <rect x="430" y="500" width="420" height="80" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="640" y="522" text-anchor="middle" font-weight="700">Write locally + parallel writes to other 4 owners</text>
+    <text x="640" y="541" text-anchor="middle" font-size="10" fill="#1f3a68">5 owners total · warm gRPC pool</text>
+    <text x="640" y="557" text-anchor="middle" font-size="10" fill="#1f3a68">ack on fastest 3 commits (W=3 of 5)</text>
+    <text x="640" y="573" text-anchor="middle" font-size="10" fill="#1f3a68">cancel slowest 2 in-flight writes</text>
+  </g>
+
+  <line x1="640" y1="580" x2="640" y2="615" stroke="#27ae60" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <g>
+    <rect x="490" y="615" width="300" height="50" rx="8" ry="8" fill="#d5f5e3" stroke="#27ae60" stroke-width="2"/>
+    <text x="640" y="635" text-anchor="middle" font-weight="700">Quorum acknowledged</text>
+    <text x="640" y="652" text-anchor="middle" font-size="10" fill="#1e6b3a">cancel pending slowest-2 writes</text>
+  </g>
+
+  <line x1="640" y1="665" x2="640" y2="700" stroke="#444" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <g>
+    <rect x="370" y="700" width="540" height="80" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="640" y="722" text-anchor="middle" font-weight="700">Cache invalidation (mandatory · NFR-PERF-2)</text>
+    <text x="640" y="741" text-anchor="middle" font-size="10" fill="#1f3a68">• local in-memory sync.Map invalidate</text>
+    <text x="640" y="757" text-anchor="middle" font-size="10" fill="#1f3a68">• gossip DELETE → Redis cross-instance</text>
+    <text x="640" y="773" text-anchor="middle" font-size="10" fill="#1f3a68">• partition-map epoch bump (auto-invalidates)</text>
+  </g>
+
+  <line x1="640" y1="780" x2="640" y2="820" stroke="#444" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Idempotency decision -->
+  <polygon points="640,820 800,860 640,900 480,860" fill="#f5f5f5" stroke="#666" stroke-width="1.5"/>
+  <text x="640" y="855" text-anchor="middle" font-weight="600">Idempotency</text>
+  <text x="640" y="872" text-anchor="middle" font-weight="600">dedup hit?</text>
+
+  <!-- This SVG is constrained vertically — fold idempotency outcomes into a single block to right -->
+  <line x1="800" y1="860" x2="900" y2="860" stroke="#e67e22" stroke-width="2" marker-end="url(#arrow-orange)"/>
+  <text x="850" y="850" text-anchor="middle" font-size="10" fill="#a85a16">request_id seen</text>
+  <g>
+    <rect x="900" y="830" width="280" height="60" rx="8" ry="8" fill="#fef9e7" stroke="#c9a227" stroke-width="1.5"/>
+    <text x="1040" y="850" text-anchor="middle" font-weight="600">Return dedup ack</text>
+    <text x="1040" y="868" text-anchor="middle" font-size="10" fill="#7d6608">no double-write</text>
+    <text x="1040" y="882" text-anchor="middle" font-size="10" fill="#7d6608">idempotency_persisted=false</text>
+  </g>
+
+  <line x1="480" y1="860" x2="370" y2="860" stroke="#444" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="425" y="850" text-anchor="middle" font-size="10" fill="#444">new id</text>
+  <g>
+    <rect x="80" y="830" width="290" height="60" rx="8" ry="8" fill="#d5f5e3" stroke="#27ae60" stroke-width="2"/>
+    <text x="225" y="850" text-anchor="middle" font-weight="700">Write committed</text>
+    <text x="225" y="868" text-anchor="middle" font-size="10" fill="#1e6b3a">OTel span closed · PUT p99 ≤ 5 ms</text>
+    <text x="225" y="882" text-anchor="middle" font-size="10" fill="#1e6b3a">VC context returned in trailer</text>
+  </g>
+</svg>
