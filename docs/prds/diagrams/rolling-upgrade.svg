@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 940" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11">
+  <title>GossamerDB v1.0 — Rolling Upgrade Sequence</title>
+  <desc>Operator triggers gossamerctl rolling-upgrade; Coordinator Raft Leader records upgrade state and walks data nodes one at a time: drain → in-flight complete → upgrade binary → restart → rejoin gossip → health-gate check. Health pass advances; health fail halts and operator-driven rollback (re-run loop with previous binary). N/N+1 skew tolerated; N/N+2 rejected (Q12).</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#444"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2980b9"/>
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c0392b"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#27ae60"/>
+    </marker>
+  </defs>
+
+  <text x="640" y="26" text-anchor="middle" font-size="16" font-weight="600" fill="#222">GossamerDB — Rolling Upgrade Sequence (§6.6.1)</text>
+  <text x="640" y="46" text-anchor="middle" font-size="11" fill="#666">N/N+1 skew tolerated · per-key unavailability &lt; 5 s (NFR-AVAIL-5) · N/N+2 explicitly rejected (Q12).</text>
+
+  <!-- Participant header boxes -->
+  <g>
+    <rect x="40" y="70" width="160" height="44" rx="6" ry="6" fill="#fef9e7" stroke="#c9a227" stroke-width="1.5"/>
+    <text x="120" y="89" text-anchor="middle" font-weight="700">Operator</text>
+    <text x="120" y="105" text-anchor="middle" font-size="10" fill="#7d6608">SRE / on-call</text>
+  </g>
+  <g>
+    <rect x="220" y="70" width="160" height="44" rx="6" ry="6" fill="#f7f7f7" stroke="#666" stroke-width="1.5"/>
+    <text x="300" y="89" text-anchor="middle" font-weight="700">gossamerctl</text>
+    <text x="300" y="105" text-anchor="middle" font-size="10" fill="#555">CLI</text>
+  </g>
+  <g>
+    <rect x="400" y="70" width="200" height="44" rx="6" ry="6" fill="#d5f5e3" stroke="#27ae60" stroke-width="2"/>
+    <text x="500" y="89" text-anchor="middle" font-weight="700">Coordinator Raft Leader</text>
+    <text x="500" y="105" text-anchor="middle" font-size="10" fill="#1e6b3a">orchestrator</text>
+  </g>
+  <g>
+    <rect x="620" y="70" width="180" height="44" rx="6" ry="6" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="710" y="89" text-anchor="middle" font-weight="700">Data Node 1</text>
+    <text x="710" y="105" text-anchor="middle" font-size="10" fill="#1f3a68">upgrading (one at a time)</text>
+  </g>
+  <g>
+    <rect x="820" y="70" width="180" height="44" rx="6" ry="6" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="910" y="89" text-anchor="middle" font-weight="700">Data Nodes 2..N</text>
+    <text x="910" y="105" text-anchor="middle" font-size="10" fill="#1f3a68">running old version</text>
+  </g>
+  <g>
+    <rect x="1020" y="70" width="220" height="44" rx="6" ry="6" fill="#fbeaff" stroke="#9b59b6" stroke-width="1.5"/>
+    <text x="1130" y="89" text-anchor="middle" font-weight="700">Health Gate</text>
+    <text x="1130" y="105" text-anchor="middle" font-size="10" fill="#5b2073">gossip + admin API</text>
+  </g>
+
+  <!-- Lifelines (dashed verticals) -->
+  <line x1="120"  y1="114" x2="120"  y2="900" stroke="#888" stroke-width="1" stroke-dasharray="3 4"/>
+  <line x1="300"  y1="114" x2="300"  y2="900" stroke="#888" stroke-width="1" stroke-dasharray="3 4"/>
+  <line x1="500"  y1="114" x2="500"  y2="900" stroke="#888" stroke-width="1" stroke-dasharray="3 4"/>
+  <line x1="710"  y1="114" x2="710"  y2="900" stroke="#888" stroke-width="1" stroke-dasharray="3 4"/>
+  <line x1="910"  y1="114" x2="910"  y2="900" stroke="#888" stroke-width="1" stroke-dasharray="3 4"/>
+  <line x1="1130" y1="114" x2="1130" y2="900" stroke="#888" stroke-width="1" stroke-dasharray="3 4"/>
+
+  <!-- Step 1: Operator → gossamerctl -->
+  <line x1="120" y1="140" x2="298" y2="140" stroke="#444" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="210" y="134" text-anchor="middle" font-size="10.5" fill="#222">gossamerctl rolling-upgrade --version=v1.N+1</text>
+
+  <!-- Step 2: gossamerctl → Coordinator -->
+  <line x1="300" y1="170" x2="498" y2="170" stroke="#444" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="400" y="164" text-anchor="middle" font-size="10.5" fill="#222">StartRollingUpgrade(target_version)</text>
+
+  <!-- Coordinator self-call: record state in Raft log -->
+  <path d="M 500 195 L 540 195 L 540 215 L 502 215" stroke="#27ae60" stroke-width="1.8" fill="none" marker-end="url(#arrow-green)"/>
+  <text x="555" y="208" font-size="10.5" fill="#1e6b3a">Record upgrade state in Raft log</text>
+
+  <!-- Loop frame -->
+  <rect x="395" y="240" width="745" height="540" rx="6" ry="6" fill="none" stroke="#2980b9" stroke-width="1.5" stroke-dasharray="6 3"/>
+  <rect x="395" y="240" width="120" height="22" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+  <text x="455" y="256" text-anchor="middle" font-size="10.5" font-weight="600" fill="#1f3a68">loop · for each data node</text>
+
+  <!-- Step: Coordinator → DN1: Drain -->
+  <line x1="500" y1="285" x2="708" y2="285" stroke="#444" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="604" y="279" text-anchor="middle" font-size="10.5" fill="#222">Drain(node=DN1) — stop accepting new requests</text>
+
+  <!-- DN1 → DN2..N: gossip drain -->
+  <line x1="710" y1="315" x2="908" y2="315" stroke="#2980b9" stroke-width="1.5" marker-end="url(#arrow-blue)" stroke-dasharray="5 3"/>
+  <text x="810" y="309" text-anchor="middle" font-size="10.5" fill="#1f3a68">Gossip: "node DN1 draining"</text>
+
+  <!-- Note: in-flight requests complete -->
+  <rect x="600" y="335" width="430" height="44" rx="6" ry="6" fill="#fffbe6" stroke="#c9a227" stroke-width="1"/>
+  <text x="815" y="354" text-anchor="middle" font-size="10.5" fill="#5e4b00">In-flight requests complete · replica ownership transfers</text>
+  <text x="815" y="370" text-anchor="middle" font-size="10.5" fill="#5e4b00">per-key unavailability &lt; 5 s (NFR-AVAIL-5)</text>
+
+  <!-- Coordinator → DN1: Upgrade binary -->
+  <line x1="500" y1="400" x2="708" y2="400" stroke="#444" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="604" y="394" text-anchor="middle" font-size="10.5" fill="#222">Upgrade binary to v1.N+1</text>
+
+  <!-- DN1 self-call: restart -->
+  <path d="M 710 425 L 750 425 L 750 445 L 712 445" stroke="#2980b9" stroke-width="1.8" fill="none" marker-end="url(#arrow-blue)"/>
+  <text x="755" y="438" font-size="10.5" fill="#1f3a68">Restart with new binary</text>
+
+  <!-- DN1 → HealthGate: rejoin -->
+  <line x1="710" y1="470" x2="1128" y2="470" stroke="#2980b9" stroke-width="1.8" marker-end="url(#arrow-blue)"/>
+  <text x="920" y="464" text-anchor="middle" font-size="10.5" fill="#1f3a68">Rejoin gossip ring · report version=v1.N+1</text>
+
+  <!-- HealthGate → Coordinator -->
+  <line x1="1130" y1="500" x2="502" y2="500" stroke="#9b59b6" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="816" y="494" text-anchor="middle" font-size="10.5" fill="#5b2073">Health check passed?</text>
+
+  <!-- alt frame -->
+  <rect x="395" y="520" width="745" height="240" rx="6" ry="6" fill="none" stroke="#666" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <rect x="395" y="520" width="80" height="22" fill="#f7f7f7" stroke="#666" stroke-width="1.2"/>
+  <text x="435" y="536" text-anchor="middle" font-size="10.5" font-weight="600" fill="#222">alt</text>
+
+  <!-- alt: pass branch -->
+  <text x="495" y="556" font-size="10.5" font-weight="600" fill="#1e6b3a">[ Health gate passes ]</text>
+  <path d="M 500 575 L 540 575 L 540 595 L 502 595" stroke="#27ae60" stroke-width="1.8" fill="none" marker-end="url(#arrow-green)"/>
+  <text x="555" y="588" font-size="10.5" fill="#1e6b3a">Mark DN1 upgraded in Raft log</text>
+  <rect x="540" y="610" width="500" height="34" rx="6" ry="6" fill="#d5f5e3" stroke="#27ae60" stroke-width="1"/>
+  <text x="790" y="630" text-anchor="middle" font-size="10.5" fill="#1e6b3a">Proceed to next data node (loop continues)</text>
+
+  <!-- Divider line for alt -->
+  <line x1="395" y1="660" x2="1140" y2="660" stroke="#666" stroke-width="1.2" stroke-dasharray="4 3"/>
+
+  <!-- alt: fail branch -->
+  <text x="495" y="680" font-size="10.5" font-weight="600" fill="#a93226">[ Health gate fails ]</text>
+  <line x1="500" y1="700" x2="122" y2="700" stroke="#c0392b" stroke-width="1.8" marker-end="url(#arrow-red)"/>
+  <text x="310" y="694" text-anchor="middle" font-size="10.5" fill="#a93226">Upgrade halted — node unhealthy</text>
+  <rect x="60" y="715" width="420" height="34" rx="6" ry="6" fill="#fdebd0" stroke="#e67e22" stroke-width="1"/>
+  <text x="270" y="735" text-anchor="middle" font-size="10.5" fill="#7d3c00">Rollback = re-run loop with previous binary (operator-driven)</text>
+
+  <!-- Final: Coordinator → gossamerctl, gossamerctl → operator -->
+  <line x1="500" y1="800" x2="302" y2="800" stroke="#444" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="400" y="794" text-anchor="middle" font-size="10.5" fill="#222">All nodes at v1.N+1</text>
+
+  <line x1="300" y1="830" x2="122" y2="830" stroke="#444" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="210" y="824" text-anchor="middle" font-size="10.5" fill="#222">Rolling upgrade complete · cluster served traffic throughout</text>
+
+  <!-- Footer note -->
+  <rect x="40" y="860" width="1200" height="60" rx="6" ry="6" fill="#fafafa" stroke="#ccc"/>
+  <text x="60" y="880" font-size="11" fill="#444"><tspan font-weight="600">Skew window:</tspan> during the loop both v1.N and v1.N+1 nodes run live · gossip + wire protocol backward-compatible within minor-version window (FR-10, NFR-OPS-3).</text>
+  <text x="60" y="898" font-size="11" fill="#444"><tspan font-weight="600">N/N+2 rejected (Q12):</tspan> upgrade orchestration refuses to start a v1.N+2 rollout while any v1.N node is still live in the cluster.</text>
+  <text x="60" y="916" font-size="11" fill="#444"><tspan font-weight="600">CI guard (R7):</tspan> any PR touching a wire-protocol or gossip-message file triggers an automatic v(N) ↔ v(N+1) interop test.</text>
+</svg>

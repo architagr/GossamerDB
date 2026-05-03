@@ -1,0 +1,173 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 760" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11">
+  <title>GossamerDB v1.0 — System Topology</title>
+  <desc>Client/SDK + L4 LB → Coordinator Raft (control plane) and Data Plane (5 data nodes, in-memory KV + cache + gossip) → Backup destinations (S3 / Postgres). Smart SDK opens direct gRPC to a data node; REST/non-Go clients route via L4 LB to any data node (tier-3 fallback).</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#444"/>
+    </marker>
+    <marker id="arrow-light" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#888"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2980b9"/>
+    </marker>
+  </defs>
+
+  <text x="640" y="26" text-anchor="middle" font-size="16" font-weight="600" fill="#222">GossamerDB — System Topology (§6.1.1)</text>
+  <text x="640" y="46" text-anchor="middle" font-size="11" fill="#666">Coordinator Raft = control plane only. Data plane = 5 data nodes per range. Both use the same binary set across local / k8s / multi-region modes.</text>
+
+  <!-- Lane: Client / SDK -->
+  <rect x="40" y="70" width="1200" height="120" rx="8" ry="8" fill="#fef9e7" fill-opacity="0.45" stroke="#c9a227" stroke-width="1.5"/>
+  <text x="56" y="90" font-size="12" font-weight="600" fill="#7d6608">Client / SDK Layer</text>
+
+  <g>
+    <rect x="120" y="105" width="220" height="70" rx="8" ry="8" fill="#fffbe6" stroke="#c9a227" stroke-width="1.5"/>
+    <text x="230" y="124" text-anchor="middle" font-weight="600">Smart Go SDK</text>
+    <text x="230" y="140" text-anchor="middle" font-size="10" fill="#555">partition-map cache,</text>
+    <text x="230" y="153" text-anchor="middle" font-size="10" fill="#555">epoch-aware routing,</text>
+    <text x="230" y="166" text-anchor="middle" font-size="10" fill="#555">token-aware gRPC streams</text>
+  </g>
+
+  <g>
+    <rect x="540" y="105" width="200" height="70" rx="8" ry="8" fill="#fffbe6" stroke="#c9a227" stroke-width="1.5"/>
+    <text x="640" y="124" text-anchor="middle" font-weight="600">REST callers</text>
+    <text x="640" y="140" text-anchor="middle" font-size="10" fill="#555">Fiber HTTP,</text>
+    <text x="640" y="153" text-anchor="middle" font-size="10" fill="#555">non-Go gRPC clients</text>
+  </g>
+
+  <g>
+    <rect x="940" y="105" width="200" height="70" rx="8" ry="8" fill="#fffbe6" stroke="#c9a227" stroke-width="1.5"/>
+    <text x="1040" y="124" text-anchor="middle" font-weight="600">L4 Load Balancer</text>
+    <text x="1040" y="140" text-anchor="middle" font-size="10" fill="#555">NLB / k8s Service</text>
+    <text x="1040" y="153" text-anchor="middle" font-size="10" fill="#555">(tier-3 fallback only)</text>
+  </g>
+
+  <line x1="640" y1="175" x2="1040" y2="175" stroke="#c9a227" stroke-width="1.2" marker-end="url(#arrow-light)"/>
+
+  <!-- Lane: Coordinator Raft -->
+  <rect x="40" y="210" width="560" height="170" rx="8" ry="8" fill="#e8f4e8" fill-opacity="0.45" stroke="#4a7c4a" stroke-width="1.5"/>
+  <text x="56" y="230" font-size="12" font-weight="600" fill="#2d5d2d">Coordinator Group — 3-node Raft (Control Plane Only)</text>
+
+  <g>
+    <rect x="80" y="255" width="140" height="90" rx="8" ry="8" fill="#d5f5e3" stroke="#27ae60" stroke-width="2"/>
+    <text x="150" y="276" text-anchor="middle" font-weight="700">C1 — Leader</text>
+    <text x="150" y="294" text-anchor="middle" font-size="10" fill="#1e6b3a">admin API,</text>
+    <text x="150" y="308" text-anchor="middle" font-size="10" fill="#1e6b3a">partition map,</text>
+    <text x="150" y="322" text-anchor="middle" font-size="10" fill="#1e6b3a">strategy config,</text>
+    <text x="150" y="336" text-anchor="middle" font-size="10" fill="#1e6b3a">upgrade orchestration</text>
+  </g>
+
+  <g>
+    <rect x="290" y="255" width="120" height="90" rx="8" ry="8" fill="#eafaf1" stroke="#4a7c4a" stroke-width="1.5"/>
+    <text x="350" y="276" text-anchor="middle" font-weight="600">C2 — Follower</text>
+    <text x="350" y="296" text-anchor="middle" font-size="10" fill="#2d5d2d">replicates Raft log</text>
+    <text x="350" y="312" text-anchor="middle" font-size="10" fill="#2d5d2d">election candidate</text>
+  </g>
+
+  <g>
+    <rect x="450" y="255" width="120" height="90" rx="8" ry="8" fill="#eafaf1" stroke="#4a7c4a" stroke-width="1.5"/>
+    <text x="510" y="276" text-anchor="middle" font-weight="600">C3 — Follower</text>
+    <text x="510" y="296" text-anchor="middle" font-size="10" fill="#2d5d2d">replicates Raft log</text>
+    <text x="510" y="312" text-anchor="middle" font-size="10" fill="#2d5d2d">election candidate</text>
+  </g>
+
+  <line x1="220" y1="285" x2="290" y2="285" stroke="#4a7c4a" stroke-width="1.5" marker-end="url(#arrow-light)"/>
+  <line x1="290" y1="295" x2="220" y2="295" stroke="#4a7c4a" stroke-width="1.5" marker-end="url(#arrow-light)"/>
+  <line x1="410" y1="285" x2="450" y2="285" stroke="#4a7c4a" stroke-width="1.5" marker-end="url(#arrow-light)"/>
+  <line x1="450" y1="295" x2="410" y2="295" stroke="#4a7c4a" stroke-width="1.5" marker-end="url(#arrow-light)"/>
+  <path d="M 220 320 Q 365 365 450 320" stroke="#4a7c4a" stroke-width="1.5" fill="none" marker-end="url(#arrow-light)"/>
+  <text x="335" y="365" text-anchor="middle" font-size="10" fill="#2d5d2d">Raft consensus (mTLS gRPC)</text>
+
+  <!-- Lane: Data Plane -->
+  <rect x="40" y="400" width="1200" height="200" rx="8" ry="8" fill="#e8f0f8" fill-opacity="0.45" stroke="#4a6a9c" stroke-width="1.5"/>
+  <text x="56" y="420" font-size="12" font-weight="600" fill="#1f3a68">Data Plane — N Data Nodes (default N=5 per range)</text>
+
+  <g id="dn-template">
+    <!-- D1 -->
+    <rect x="80" y="445" width="200" height="135" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="180" y="466" text-anchor="middle" font-weight="700">Data Node 1</text>
+    <text x="180" y="486" text-anchor="middle" font-size="10" fill="#1f3a68">in-memory KV (sync.Map)</text>
+    <text x="180" y="502" text-anchor="middle" font-size="10" fill="#1f3a68">cache layer</text>
+    <text x="180" y="518" text-anchor="middle" font-size="10" fill="#1f3a68">SWIM gossip + Plumtree</text>
+    <text x="180" y="534" text-anchor="middle" font-size="10" fill="#1f3a68">vector-clock + conflict resolve</text>
+    <text x="180" y="550" text-anchor="middle" font-size="10" fill="#1f3a68">gRPC + Fiber REST</text>
+    <text x="180" y="566" text-anchor="middle" font-size="10" fill="#1f3a68">Merkle anti-entropy</text>
+  </g>
+
+  <g>
+    <rect x="310" y="445" width="170" height="135" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="395" y="466" text-anchor="middle" font-weight="700">Data Node 2</text>
+    <text x="395" y="486" text-anchor="middle" font-size="10" fill="#1f3a68">(same components</text>
+    <text x="395" y="500" text-anchor="middle" font-size="10" fill="#1f3a68">as DN1)</text>
+  </g>
+  <g>
+    <rect x="510" y="445" width="170" height="135" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="595" y="466" text-anchor="middle" font-weight="700">Data Node 3</text>
+    <text x="595" y="486" text-anchor="middle" font-size="10" fill="#1f3a68">(same components)</text>
+  </g>
+  <g>
+    <rect x="710" y="445" width="170" height="135" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="795" y="466" text-anchor="middle" font-weight="700">Data Node 4</text>
+    <text x="795" y="486" text-anchor="middle" font-size="10" fill="#1f3a68">(same components)</text>
+  </g>
+  <g>
+    <rect x="910" y="445" width="170" height="135" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="995" y="466" text-anchor="middle" font-weight="700">Data Node 5</text>
+    <text x="995" y="486" text-anchor="middle" font-size="10" fill="#1f3a68">(same components)</text>
+  </g>
+
+  <!-- Gossip arc among data nodes -->
+  <path d="M 180 580 Q 580 640 995 580" stroke="#2980b9" stroke-width="1.5" fill="none" stroke-dasharray="4 3"/>
+  <text x="580" y="630" text-anchor="middle" font-size="10" fill="#1f3a68">SWIM + Plumtree gossip · Merkle anti-entropy (peer ↔ peer)</text>
+
+  <!-- Lane: Backup -->
+  <rect x="40" y="620" width="1200" height="120" rx="8" ry="8" fill="#fdf2f8" fill-opacity="0.45" stroke="#9b59b6" stroke-width="1.5"/>
+  <text x="56" y="640" font-size="12" font-weight="600" fill="#6c2c8c">Backup destinations (operator-selected)</text>
+  <g>
+    <rect x="320" y="660" width="220" height="65" rx="8" ry="8" fill="#fbeaff" stroke="#9b59b6" stroke-width="1.5"/>
+    <text x="430" y="680" text-anchor="middle" font-weight="600">S3-compatible object storage</text>
+    <text x="430" y="697" text-anchor="middle" font-size="10" fill="#5b2073">Raft snapshots + KV snapshots</text>
+    <text x="430" y="711" text-anchor="middle" font-size="10" fill="#5b2073">FR-7 / FR-18</text>
+  </g>
+  <g>
+    <rect x="700" y="660" width="220" height="65" rx="8" ry="8" fill="#fbeaff" stroke="#9b59b6" stroke-width="1.5"/>
+    <text x="810" y="680" text-anchor="middle" font-weight="600">PostgreSQL (bytea table)</text>
+    <text x="810" y="697" text-anchor="middle" font-size="10" fill="#5b2073">control-plane / dev sizing</text>
+    <text x="810" y="711" text-anchor="middle" font-size="10" fill="#5b2073">FR-7 / FR-18</text>
+  </g>
+
+  <!-- Edges: SDK direct → DN (tier 1) -->
+  <path d="M 230 175 Q 230 320 200 445" stroke="#2980b9" stroke-width="2" fill="none" marker-end="url(#arrow-blue)"/>
+  <text x="100" y="320" font-size="10" fill="#1f3a68">tier-1 direct mTLS gRPC</text>
+  <text x="100" y="333" font-size="10" fill="#1f3a68">(one client→cluster hop)</text>
+
+  <!-- Edges: L4 LB → DN3 / DN5 (tier 3 fallback) -->
+  <path d="M 1040 175 Q 1040 290 600 445" stroke="#888" stroke-width="1.5" fill="none" marker-end="url(#arrow-light)" stroke-dasharray="4 3"/>
+  <path d="M 1040 175 Q 1040 320 995 445" stroke="#888" stroke-width="1.5" fill="none" marker-end="url(#arrow-light)" stroke-dasharray="4 3"/>
+  <text x="1130" y="320" text-anchor="middle" font-size="10" fill="#666">tier-3 fallback</text>
+  <text x="1130" y="333" text-anchor="middle" font-size="10" fill="#666">(any-data-node)</text>
+
+  <!-- Coordinator → Data plane gossip of partition map -->
+  <path d="M 320 345 Q 320 410 320 445" stroke="#4a7c4a" stroke-width="1.5" fill="none" marker-end="url(#arrow-light)"/>
+  <text x="245" y="395" font-size="10" fill="#2d5d2d">gossip:</text>
+  <text x="245" y="408" font-size="10" fill="#2d5d2d">partition map,</text>
+  <text x="245" y="421" font-size="10" fill="#2d5d2d">strategy config,</text>
+  <text x="245" y="434" font-size="10" fill="#2d5d2d">region epoch</text>
+
+  <!-- Coordinator → Backup -->
+  <path d="M 150 345 Q 150 600 380 660" stroke="#9b59b6" stroke-width="1.2" fill="none" marker-end="url(#arrow-light)" stroke-dasharray="4 3"/>
+  <path d="M 150 345 Q 150 600 760 660" stroke="#9b59b6" stroke-width="1.2" fill="none" marker-end="url(#arrow-light)" stroke-dasharray="4 3"/>
+  <text x="55" y="540" font-size="9.5" fill="#6c2c8c">Raft snapshots</text>
+  <text x="55" y="553" font-size="9.5" fill="#6c2c8c">+ partition-map archive</text>
+
+  <!-- Data node → Backup -->
+  <path d="M 200 580 Q 200 620 410 660" stroke="#9b59b6" stroke-width="1.2" fill="none" marker-end="url(#arrow-light)" stroke-dasharray="4 3"/>
+  <path d="M 200 580 Q 200 620 770 660" stroke="#9b59b6" stroke-width="1.2" fill="none" marker-end="url(#arrow-light)" stroke-dasharray="4 3"/>
+  <text x="50" y="650" font-size="9.5" fill="#6c2c8c">gossamerctl snapshot (FR-18)</text>
+
+  <!-- Legend -->
+  <g transform="translate(40,60)">
+    <rect x="0" y="0" width="0" height="0" fill="none"/>
+  </g>
+</svg>

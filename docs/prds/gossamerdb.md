@@ -376,6 +376,11 @@ The HLD locks the exact vnode count; this PRD locks the **constraints the HLD mu
 
 #### 6.1.1 System topology diagram
 
+![System topology](diagrams/system-topology.svg)
+
+<details>
+<summary>Mermaid source (for renderers that prefer it)</summary>
+
 ```mermaid
 graph TB
     subgraph ClientLayer["Client / SDK Layer"]
@@ -426,9 +431,16 @@ graph TB
     style BackupLayer fill:#fdf2f8,stroke:#9b59b6
 ```
 
+</details>
+
 > **Deployment mode note.** All three deployment modes (local, Kubernetes, multi-region AWS) use the same binary set. In **local** mode all nodes run on one host. In **Kubernetes** mode each group runs as a StatefulSet with headless services. In **multi-region AWS** mode the data-node ring spans regions with region-aware SWIM gossip; passive regions receive async cross-region replication from the primary (FR-21, §6.4).
 
 #### 6.1.2 Coordinator HA / Raft group diagram
+
+![Coordinator HA / Raft group](diagrams/coordinator-raft.svg)
+
+<details>
+<summary>Mermaid source (for renderers that prefer it)</summary>
 
 ```mermaid
 graph LR
@@ -464,6 +476,8 @@ graph LR
     style DataPlane2 fill:#e8f0f8,stroke:#4a6a9c
 ```
 
+</details>
+
 ### 6.2 Request lifecycle (Get / Put)
 
 **Primary path (smart Go SDK, FR-8 tier 1 + FR-20):**
@@ -481,6 +495,11 @@ graph LR
 3. If A is **not** an owner, A forwards once to a chosen owner B (one extra ~150–300 µs hop), and B becomes the request coordinator. The fallback path therefore costs at most one additional intra-AZ hop relative to the primary path; it is not subject to the GET p99 < 1 ms request-level budget for these callers but is still gated by the per-component bench harness.
 
 #### 6.2.1 Get request lifecycle diagram
+
+![Get request lifecycle](diagrams/get-lifecycle.svg)
+
+<details>
+<summary>Mermaid source (for renderers that prefer it)</summary>
 
 ```mermaid
 flowchart TD
@@ -515,7 +534,14 @@ flowchart TD
     style B3 fill:#fdf2f8,stroke:#9b59b6
 ```
 
+</details>
+
 #### 6.2.2 Put request lifecycle diagram
+
+![Put request lifecycle](diagrams/put-lifecycle.svg)
+
+<details>
+<summary>Mermaid source (for renderers that prefer it)</summary>
 
 ```mermaid
 flowchart TD
@@ -541,6 +567,8 @@ flowchart TD
     style I fill:#fef9e7,stroke:#c9a227
 ```
 
+</details>
+
 ### 6.3 What the cache layer caches
 
 The cache contract is binding (A1, NFR-PERF-2, FR-12). Both layers below populate from `R=ONE` **and** from successful `R=QUORUM` results, under the same key shape, the same TTL ceiling, and the same invalidation rules — keeping QUORUM reads inside the < 1 ms budget without sacrificing freshness.
@@ -554,6 +582,11 @@ The cache contract is binding (A1, NFR-PERF-2, FR-12). Both layers below populat
 The HLD must demonstrate that the cache-hit path stays under **1 ms p99** with `b.ReportAllocs()` on a representative payload distribution **at both `R=ONE` and `R=QUORUM`**, or the feature does not ship.
 
 #### 6.3.1 Cache layer and invalidation flow diagram
+
+![Cache layer and invalidation flow](diagrams/cache-invalidation.svg)
+
+<details>
+<summary>Mermaid source (for renderers that prefer it)</summary>
 
 ```mermaid
 flowchart LR
@@ -593,9 +626,16 @@ flowchart LR
     style I4 fill:#eaf2ff,stroke:#2980b9
 ```
 
+</details>
+
 ### 6.4 Active-passive multi-region topology
 
 #### 6.4.1 Multi-region topology diagram
+
+![Active-passive multi-region topology](diagrams/multi-region-topology.svg)
+
+<details>
+<summary>Mermaid source (for renderers that prefer it)</summary>
 
 ```mermaid
 graph TB
@@ -646,6 +686,8 @@ graph TB
     style Failover fill:#fdf2f8,stroke:#9b59b6
 ```
 
+</details>
+
 > **`cross_region.mode = none` (default):** omit Passive Region boxes entirely — all traffic stays within the single region, no WAN replication, no `WRONG_REGION` errors. Active-active (`FC-3`) is deferred to v1.2.
 
 ---
@@ -666,6 +708,11 @@ This section is informational. The binding statements are in NFR-SEC-7 and FR-21
 ### 6.6 Rolling upgrade sequence
 
 #### 6.6.1 Rolling upgrade sequence diagram
+
+![Rolling upgrade sequence](diagrams/rolling-upgrade.svg)
+
+<details>
+<summary>Mermaid source (for renderers that prefer it)</summary>
 
 ```mermaid
 sequenceDiagram
@@ -701,11 +748,18 @@ sequenceDiagram
     gossamerctl-->>Operator: Rolling upgrade complete\nCluster served traffic throughout
 ```
 
+</details>
+
 > **N / N+1 skew:** during the upgrade window both `v1.N` and `v1.N+1` nodes are live simultaneously — the gossip protocol and wire protocol are backward-compatible within a minor-version window (FR-10, NFR-OPS-3). N / N+2 skew is explicitly rejected (Q12).
 
 ### 6.7 mTLS / PKI flow
 
 #### 6.7.1 mTLS / PKI flow diagram
+
+![mTLS / PKI flow](diagrams/mtls-pki.svg)
+
+<details>
+<summary>Mermaid source (for renderers that prefer it)</summary>
 
 ```mermaid
 flowchart TD
@@ -753,6 +807,8 @@ flowchart TD
     style Validation fill:#e8f4e8,stroke:#4a7c4a
     style HotReload fill:#eaf2ff,stroke:#2980b9
 ```
+
+</details>
 
 > **Built-in CA is permanently rejected** (not deferred) — see FR-6 and Q8. SPIFFE and Vault are deferred to v1.x as additional `pki.Source` implementations (FC-6).
 
