@@ -1,0 +1,208 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 480" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11">
+  <title>GossamerDB v1.0 — Milestone Dependency DAG</title>
+  <desc>Milestones M1 (PRD signed off) through M13 (v1.0 GA candidate). Critical path highlighted. Fan-in to M12 and M13 noted at the bottom rather than drawn, to keep the diagram readable.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="strokeWidth" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#444"/>
+    </marker>
+    <marker id="arrow-light" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="strokeWidth" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#999"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="640" y="26" text-anchor="middle" font-size="16" font-weight="600" fill="#222">GossamerDB v1.0 — Milestone Dependency DAG</text>
+  <text x="640" y="46" text-anchor="middle" font-size="11" fill="#666">Critical path: M1 → M2 → M3 → M4 → M5 → M7 → M8 → M11 → M12 → M13</text>
+
+  <!-- Layer hint stripes -->
+  <g opacity="0.04">
+    <rect x="40"   y="60" width="110" height="380" fill="#888"/>
+    <rect x="280"  y="60" width="110" height="380" fill="#888"/>
+    <rect x="520"  y="60" width="110" height="380" fill="#888"/>
+    <rect x="760"  y="60" width="110" height="380" fill="#888"/>
+    <rect x="1000" y="60" width="110" height="380" fill="#888"/>
+  </g>
+
+  <!-- ===== Edges (drawn first so nodes overlay them) ===== -->
+
+  <!-- Sequential spine M1..M4 (bold critical path) -->
+  <line x1="160" y1="220" x2="220" y2="220" stroke="#222" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="280" y1="220" x2="340" y2="220" stroke="#222" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="400" y1="220" x2="460" y2="220" stroke="#222" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- M4 fork to M5 (up) and M6 (down) -->
+  <path d="M 520 220 Q 560 220 580 130" stroke="#222" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <path d="M 520 220 Q 560 220 580 320" stroke="#222" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- M5 → M7 / M6 → M7 (parallel converge) -->
+  <path d="M 700 130 Q 740 130 740 200" stroke="#222" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <path d="M 700 320 Q 740 320 740 240" stroke="#222" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- M3 → M9 (long curved jump) -->
+  <path d="M 370 250 Q 400 380 700 350" stroke="#666" stroke-width="1.5" fill="none" marker-end="url(#arrow-light)" stroke-dasharray="0"/>
+
+  <!-- M5 → M9 -->
+  <path d="M 660 160 Q 700 280 700 320" stroke="#666" stroke-width="1.5" fill="none" marker-end="url(#arrow-light)"/>
+
+  <!-- M7 → M8 -->
+  <path d="M 820 200 Q 860 200 860 140" stroke="#222" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- M7 → M11 (horizontal) -->
+  <line x1="820" y1="220" x2="860" y2="220" stroke="#222" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- M5 → M10 (downward, curved) -->
+  <path d="M 660 140 Q 800 260 860 320" stroke="#666" stroke-width="1.5" fill="none" marker-end="url(#arrow-light)"/>
+
+  <!-- M9 → M10 (horizontal) -->
+  <line x1="820" y1="340" x2="860" y2="340" stroke="#666" stroke-width="1.5" marker-end="url(#arrow-light)"/>
+
+  <!-- M9 → M11 (up-diagonal) -->
+  <path d="M 800 320 Q 850 280 870 240" stroke="#666" stroke-width="1.5" fill="none" marker-end="url(#arrow-light)"/>
+
+  <!-- M8 → M12 -->
+  <path d="M 980 130 Q 1020 130 1020 200" stroke="#666" stroke-width="1.5" fill="none" marker-end="url(#arrow-light)"/>
+
+  <!-- M11 → M12 (bold critical path) -->
+  <line x1="980" y1="220" x2="1020" y2="220" stroke="#222" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- M10 → M12 -->
+  <path d="M 980 320 Q 1020 320 1020 240" stroke="#666" stroke-width="1.5" fill="none" marker-end="url(#arrow-light)"/>
+
+  <!-- M12 → M13 (bold) -->
+  <line x1="1100" y1="220" x2="1160" y2="220" stroke="#222" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+  <!-- ===== Nodes ===== -->
+  <!-- helper: rounded rect 100x50 centered on (cx, cy) -->
+
+  <!-- M1 (start, yellow) -->
+  <g>
+    <rect x="60" y="195" width="100" height="50" rx="8" ry="8" fill="#fef9e7" stroke="#c9a227" stroke-width="2"/>
+    <text x="110" y="216" text-anchor="middle" font-weight="600">M1</text>
+    <text x="110" y="232" text-anchor="middle" font-size="10" fill="#555">PRD signed off</text>
+  </g>
+
+  <!-- M2 -->
+  <g>
+    <rect x="180" y="195" width="100" height="50" rx="8" ry="8" fill="#f7f7f7" stroke="#666" stroke-width="1.5"/>
+    <text x="230" y="214" text-anchor="middle" font-weight="600">M2</text>
+    <text x="230" y="228" text-anchor="middle" font-size="9.5" fill="#555">HLD + LLD +</text>
+    <text x="230" y="240" text-anchor="middle" font-size="9.5" fill="#555">Epics + Stories</text>
+  </g>
+
+  <!-- M3 (foundations, blue) -->
+  <g>
+    <rect x="300" y="195" width="100" height="50" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="2"/>
+    <text x="350" y="214" text-anchor="middle" font-weight="600">M3</text>
+    <text x="350" y="228" text-anchor="middle" font-size="9.5" fill="#444">Foundations:</text>
+    <text x="350" y="240" text-anchor="middle" font-size="9.5" fill="#444">store + cache</text>
+  </g>
+
+  <!-- M4 -->
+  <g>
+    <rect x="420" y="195" width="100" height="50" rx="8" ry="8" fill="#f7f7f7" stroke="#666" stroke-width="1.5"/>
+    <text x="470" y="214" text-anchor="middle" font-weight="600">M4</text>
+    <text x="470" y="228" text-anchor="middle" font-size="9.5" fill="#555">Single-node KV</text>
+    <text x="470" y="240" text-anchor="middle" font-size="9.5" fill="#555">mTLS + gRPC + REST</text>
+  </g>
+
+  <!-- M5 (top row) -->
+  <g>
+    <rect x="580" y="105" width="100" height="50" rx="8" ry="8" fill="#f7f7f7" stroke="#666" stroke-width="1.5"/>
+    <text x="630" y="124" text-anchor="middle" font-weight="600">M5</text>
+    <text x="630" y="138" text-anchor="middle" font-size="9.5" fill="#555">Coordinator Raft</text>
+    <text x="630" y="150" text-anchor="middle" font-size="9.5" fill="#555">+ partition map</text>
+  </g>
+
+  <!-- M6 (bottom row) -->
+  <g>
+    <rect x="580" y="295" width="100" height="50" rx="8" ry="8" fill="#f7f7f7" stroke="#666" stroke-width="1.5"/>
+    <text x="630" y="314" text-anchor="middle" font-weight="600">M6</text>
+    <text x="630" y="328" text-anchor="middle" font-size="9.5" fill="#555">Gossip SWIM</text>
+    <text x="630" y="340" text-anchor="middle" font-size="9.5" fill="#555">+ Plumtree</text>
+  </g>
+
+  <!-- M7 (vector clocks, blue) -->
+  <g>
+    <rect x="720" y="195" width="100" height="50" rx="8" ry="8" fill="#eaf2ff" stroke="#2980b9" stroke-width="2"/>
+    <text x="770" y="214" text-anchor="middle" font-weight="600">M7</text>
+    <text x="770" y="228" text-anchor="middle" font-size="9.5" fill="#444">Vector clocks +</text>
+    <text x="770" y="240" text-anchor="middle" font-size="9.5" fill="#444">LWW + siblings</text>
+  </g>
+
+  <!-- M8 (top row) -->
+  <g>
+    <rect x="840" y="105" width="100" height="50" rx="8" ry="8" fill="#f7f7f7" stroke="#666" stroke-width="1.5"/>
+    <text x="890" y="124" text-anchor="middle" font-weight="600">M8</text>
+    <text x="890" y="138" text-anchor="middle" font-size="9.5" fill="#555">Merkle anti-entropy</text>
+    <text x="890" y="150" text-anchor="middle" font-size="9.5" fill="#555">+ hydration</text>
+  </g>
+
+  <!-- M9 (lower row, near M7) -->
+  <g>
+    <rect x="700" y="295" width="100" height="50" rx="8" ry="8" fill="#f7f7f7" stroke="#666" stroke-width="1.5"/>
+    <text x="750" y="314" text-anchor="middle" font-weight="600">M9</text>
+    <text x="750" y="328" text-anchor="middle" font-size="9.5" fill="#555">Backup + snapshot</text>
+    <text x="750" y="340" text-anchor="middle" font-size="9.5" fill="#555">+ restore</text>
+  </g>
+
+  <!-- M10 (bottom row, M11 col) -->
+  <g>
+    <rect x="840" y="295" width="100" height="50" rx="8" ry="8" fill="#f7f7f7" stroke="#666" stroke-width="1.5"/>
+    <text x="890" y="314" text-anchor="middle" font-weight="600">M10</text>
+    <text x="890" y="328" text-anchor="middle" font-size="9.5" fill="#555">Rolling upgrade</text>
+    <text x="890" y="340" text-anchor="middle" font-size="9.5" fill="#555">+ CLI</text>
+  </g>
+
+  <!-- M11 (multi-region, purple) -->
+  <g>
+    <rect x="860" y="195" width="100" height="50" rx="8" ry="8" fill="#fdf2f8" stroke="#9b59b6" stroke-width="2"/>
+    <text x="910" y="214" text-anchor="middle" font-weight="600">M11</text>
+    <text x="910" y="228" text-anchor="middle" font-size="9.5" fill="#444">Active-passive</text>
+    <text x="910" y="240" text-anchor="middle" font-size="9.5" fill="#444">cross-region</text>
+  </g>
+
+  <!-- M12 -->
+  <g>
+    <rect x="1000" y="195" width="100" height="50" rx="8" ry="8" fill="#f7f7f7" stroke="#666" stroke-width="1.5"/>
+    <text x="1050" y="214" text-anchor="middle" font-weight="600">M12</text>
+    <text x="1050" y="228" text-anchor="middle" font-size="9.5" fill="#555">Reference</text>
+    <text x="1050" y="240" text-anchor="middle" font-size="9.5" fill="#555">observability</text>
+  </g>
+
+  <!-- M13 (GA, green) -->
+  <g>
+    <rect x="1160" y="195" width="100" height="50" rx="8" ry="8" fill="#d5f5e3" stroke="#27ae60" stroke-width="2.5"/>
+    <text x="1210" y="216" text-anchor="middle" font-weight="700">M13</text>
+    <text x="1210" y="232" text-anchor="middle" font-size="10" fill="#1e8449">v1.0 GA candidate</text>
+  </g>
+
+  <!-- ===== Implicit fan-in annotation ===== -->
+  <g>
+    <rect x="40" y="395" width="1200" height="68" rx="6" ry="6" fill="#fafafa" stroke="#ccc" stroke-width="1"/>
+    <text x="60" y="416" font-size="11" font-weight="600" fill="#333">Implicit fan-in (drawn as annotation, not arrows, to keep the diagram readable):</text>
+    <text x="60" y="434" font-size="10.5" fill="#555">• <tspan font-weight="600">M12</tspan> additionally depends on M4, M5, M6, M7 (drawn arrows above show only the closest deps).</text>
+    <text x="60" y="450" font-size="10.5" fill="#555">• <tspan font-weight="600">M13</tspan> additionally depends on M3, M4, M5, M6, M7, M8, M9, M10 (M11 → M12 → M13 is the drawn critical path).</text>
+  </g>
+
+  <!-- ===== Legend ===== -->
+  <g transform="translate(40, 60)">
+    <rect x="0" y="0" width="240" height="34" rx="4" ry="4" fill="white" stroke="#ddd"/>
+    <rect x="8"  y="10" width="14" height="14" rx="3" ry="3" fill="#fef9e7" stroke="#c9a227" stroke-width="1.5"/>
+    <text x="28"  y="21" font-size="10" fill="#444">start</text>
+    <rect x="60" y="10" width="14" height="14" rx="3" ry="3" fill="#eaf2ff" stroke="#2980b9" stroke-width="1.5"/>
+    <text x="80"  y="21" font-size="10" fill="#444">critical</text>
+    <rect x="125" y="10" width="14" height="14" rx="3" ry="3" fill="#fdf2f8" stroke="#9b59b6" stroke-width="1.5"/>
+    <text x="145" y="21" font-size="10" fill="#444">multi-region</text>
+    <rect x="200" y="10" width="14" height="14" rx="3" ry="3" fill="#d5f5e3" stroke="#27ae60" stroke-width="1.5"/>
+    <text x="220" y="21" font-size="10" fill="#444">GA</text>
+  </g>
+
+  <g transform="translate(990, 60)">
+    <rect x="0" y="0" width="250" height="34" rx="4" ry="4" fill="white" stroke="#ddd"/>
+    <line x1="10" y1="14" x2="40" y2="14" stroke="#222" stroke-width="2.5"/>
+    <text x="48" y="18" font-size="10" fill="#444">critical path</text>
+    <line x1="125" y1="14" x2="155" y2="14" stroke="#666" stroke-width="1.5"/>
+    <text x="163" y="18" font-size="10" fill="#444">support edge</text>
+  </g>
+</svg>
