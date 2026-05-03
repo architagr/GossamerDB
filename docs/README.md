@@ -4,15 +4,15 @@ This directory holds the design package for GossamerDB. Documents below are prod
 
 ## Index
 
-| #   | Document                    | Author         | Path                                       | Status                                |
-| --- | --------------------------- | -------------- | ------------------------------------------ | ------------------------------------- |
-| 1   | Wiki (initial requirements) | Archit Agarwal | [`wiki/gossamerdb.md`](wiki/gossamerdb.md) | Done                                  |
-| 2   | PRD (Product Requirements)  | Archit Agarwal | [`prds/gossamerdb.md`](prds/gossamerdb.md) | Draft v1.4 — awaiting design sign-off |
-| 3   | HLD (High-Level Design)     | Archit Agarwal | `hld/gossamerdb.md`                        | Pending                               |
-| 4   | LLD (Low-Level Design)      | Archit Agarwal | `lld/gossamerdb.md`                        | Pending                               |
-| 5   | Epics                       | Archit Agarwal | `epics/gossamerdb/`                        | Pending                               |
-| 6   | Stories (≤ 300 LOC each)    | Archit Agarwal | `stories/gossamerdb/<epic>/`               | Pending                               |
-| 7   | Migration plans             | Archit Agarwal | `migrations/<feature>.md`                  | Created per feature                   |
+| #   | Document                    | Author         | Path                               | Status                                |
+| --- | --------------------------- | -------------- | ---------------------------------- | ------------------------------------- |
+| 1   | Wiki (initial requirements) | Archit Agarwal | [`wiki/README.md`](wiki/README.md) | Done                                  |
+| 2   | PRD (Product Requirements)  | Archit Agarwal | [`prds/README.md`](prds/README.md) | Draft v1.4 — awaiting design sign-off |
+| 3   | HLD (High-Level Design)     | Archit Agarwal | `hld/gossamerdb.md`                | Pending                               |
+| 4   | LLD (Low-Level Design)      | Archit Agarwal | `lld/gossamerdb.md`                | Pending                               |
+| 5   | Epics                       | Archit Agarwal | `epics/gossamerdb/`                | Pending                               |
+| 6   | Stories (≤ 300 LOC each)    | Archit Agarwal | `stories/gossamerdb/<epic>/`       | Pending                               |
+| 7   | Migration plans             | Archit Agarwal | `migrations/<feature>.md`          | Created per feature                   |
 
 ## Reading order
 
