@@ -1,3 +1,4 @@
 name: gossamerdb-infra
 runtime: go
 description: GossamerDB infrastructure as code (Pulumi Go SDK)
+# requires Go 1.25+ (pulumi/sdk/v3 minimum)
