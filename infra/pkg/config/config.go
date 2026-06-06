@@ -39,16 +39,20 @@ type Config struct {
 	Namespace string
 }
 
-// Validate returns a non-nil error if c is missing required fields or
-// specifies an unrecognised Env. It does not validate field combinations
-// (e.g. AWSRegion required for EnvAWS); that is the responsibility of the
-// stack constructor.
+// Validate returns a non-nil error if c is missing required fields, specifies
+// an unrecognised Env, or violates a cross-field constraint (e.g. AWSRegion
+// must be non-empty when Env is EnvAWS).
 func (c Config) Validate() error {
 	if c.ClusterName == "" {
 		return fmt.Errorf("clusterName must not be empty")
 	}
 	switch c.Env {
-	case EnvLocal, EnvK8s, EnvAWS:
+	case EnvLocal, EnvK8s:
+		return nil
+	case EnvAWS:
+		if c.AWSRegion == "" {
+			return fmt.Errorf("awsRegion must not be empty when env is aws")
+		}
 		return nil
 	default:
 		return fmt.Errorf("unknown env %q: must be local|k8s|aws", c.Env)

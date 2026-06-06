@@ -32,6 +32,8 @@ func deploy(ctx *pulumi.Context) error {
 	case config.EnvAWS:
 		return deployAWS(ctx, cfg)
 	default:
+		// Validate() already rejects unknown envs; this guards against future Env additions
+		// that miss a corresponding case here.
 		return fmt.Errorf("unhandled env %q", cfg.Env)
 	}
 }
