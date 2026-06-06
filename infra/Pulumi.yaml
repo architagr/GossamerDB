@@ -1,0 +1,3 @@
+name: gossamerdb-infra
+runtime: go
+description: GossamerDB infrastructure as code (Pulumi Go SDK)
