@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	"gossamerdb/infra/pkg/aws"
 	"gossamerdb/infra/pkg/config"
 	"gossamerdb/infra/pkg/local"
 )
@@ -49,7 +50,8 @@ func deployK8s(ctx *pulumi.Context, cfg config.Config) error {
 	return ctx.Log.Info(fmt.Sprintf("k8s stack: cluster=%s namespace=%s", cfg.ClusterName, cfg.Namespace), nil)
 }
 
-// deployAWS is the stub for INFRA-3 (EKS provisioner).
+// deployAWS provisions an EKS cluster on AWS via INFRA-3.
 func deployAWS(ctx *pulumi.Context, cfg config.Config) error {
-	return ctx.Log.Info(fmt.Sprintf("aws stack: region=%s cluster=%s", cfg.AWSRegion, cfg.ClusterName), nil)
+	_, err := aws.NewCluster(ctx, &cfg)
+	return err
 }
