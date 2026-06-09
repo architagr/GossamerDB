@@ -1,16 +1,20 @@
 // Package local provides helpers for managing local KIND (Kubernetes IN Docker)
 // clusters used in development and CI environments. It is responsible for
-// building KIND node configurations and resolving Kubernetes node image tags.
-// It is NOT responsible for Pulumi resource lifecycle, remote cluster
-// provisioning, or any persistent state. Key entry points: [buildNodes],
-// [k8sNodeImage], [createKindCluster].
+// building KIND node configurations, resolving Kubernetes node image tags, and
+// provisioning clusters with idempotent kubeconfig export. It is NOT
+// responsible for Pulumi resource lifecycle, remote cluster provisioning, or
+// any persistent state. Key entry points: [buildNodes], [k8sNodeImage],
+// [createKindCluster].
 package local
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	kindv1a4 "sigs.k8s.io/kind/pkg/apis/config/v1alpha4"
+	kindcluster "sigs.k8s.io/kind/pkg/cluster"
 )
 
 // buildNodes returns a KIND node list consisting of one control-plane node
@@ -45,12 +49,73 @@ func k8sNodeImage(version string) string {
 	return "kindest/node:v" + v
 }
 
+// alreadyExists reports whether a KIND cluster with the given name is present
+// in the list returned by provider.List(). Returns (false, err) if listing
+// fails; callers should treat any error as a hard failure, not as "does not
+// exist".
+func alreadyExists(provider *kindcluster.Provider, name string) (bool, error) {
+	clusters, err := provider.List()
+	if err != nil {
+		return false, fmt.Errorf("list clusters: %w", err)
+	}
+	for _, c := range clusters {
+		if c == name {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // createKindCluster provisions a KIND cluster with the given name and topology,
-// writes its kubeconfig, and returns the path to that kubeconfig file.
-// It is idempotent: if a cluster with the given name already exists it returns
-// the existing kubeconfig path without error.
+// writes its kubeconfig to ~/.kube/gossamerdb-<name>.yaml, and returns that
+// path. It is idempotent: if a cluster with the given name already exists it
+// skips creation, retrieves the existing kubeconfig, and returns the path
+// without error.
 //
-// Implemented in Task 4; returns [ErrNotImplemented] until then.
+// nodeCount is the number of worker nodes; pass 0 for a single control-plane
+// cluster. k8sVersion accepts "1.29", "1.29.2", or "v1.29.0".
+//
+// why: writing to ~/.kube/gossamerdb-<name>.yaml keeps the generated kubeconfig
+// isolated from the user's default ~/.kube/config, preventing accidental
+// context pollution across clusters.
 func createKindCluster(name string, nodeCount int, k8sVersion string) (string, error) {
-	return "", fmt.Errorf("not implemented")
+	provider := kindcluster.NewProvider()
+
+	exists, err := alreadyExists(provider, name)
+	if err != nil {
+		return "", err
+	}
+
+	if !exists {
+		kindCfg := &kindv1a4.Cluster{
+			Nodes: buildNodes(nodeCount),
+		}
+		if err := provider.Create(
+			name,
+			kindcluster.CreateWithV1Alpha4Config(kindCfg),
+			kindcluster.CreateWithNodeImage(k8sNodeImage(k8sVersion)),
+		); err != nil {
+			return "", fmt.Errorf("kind create: %w", err)
+		}
+	}
+
+	kubeConfigStr, err := provider.KubeConfig(name, false)
+	if err != nil {
+		return "", fmt.Errorf("get kubeconfig: %w", err)
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("home dir: %w", err)
+	}
+
+	kubeconfigPath := filepath.Join(homeDir, ".kube", "gossamerdb-"+name+".yaml")
+	if err := os.MkdirAll(filepath.Dir(kubeconfigPath), 0o755); err != nil {
+		return "", fmt.Errorf("mkdir kubeconfig dir: %w", err)
+	}
+	if err := os.WriteFile(kubeconfigPath, []byte(kubeConfigStr), 0o600); err != nil {
+		return "", fmt.Errorf("write kubeconfig: %w", err)
+	}
+
+	return kubeconfigPath, nil
 }
