@@ -61,8 +61,8 @@ func TestEKSVersion(t *testing.T) {
 // pulumi.StringOutput, this test fails to compile.
 func TestClusterOutputs_hasRequiredFields(t *testing.T) {
 	var o ClusterOutputs
-	var _ pulumi.StringOutput = o.ClusterName
-	var _ pulumi.StringOutput = o.ClusterEndpoint
-	var _ pulumi.StringOutput = o.Kubeconfig
-	var _ pulumi.StringOutput = o.NodeRoleARN
+	var _ pulumi.StringOutput = o.ClusterName     //nolint:staticcheck // explicit type is the compile-time assertion
+	var _ pulumi.StringOutput = o.ClusterEndpoint //nolint:staticcheck // explicit type is the compile-time assertion
+	var _ pulumi.StringOutput = o.Kubeconfig      //nolint:staticcheck // explicit type is the compile-time assertion
+	var _ pulumi.StringOutput = o.NodeRoleARN     //nolint:staticcheck // explicit type is the compile-time assertion
 }
