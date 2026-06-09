@@ -1,6 +1,6 @@
 module gossamerdb/infra
 
-go 1.25.8
+go 1.26.4
 
 require (
 	github.com/pulumi/pulumi/sdk/v3 v3.245.0
