@@ -57,6 +57,15 @@ func createVPC(ctx *pulumi.Context, clusterName string, region string) (*vpcOutp
 		return nil, fmt.Errorf("public route table: %w", err)
 	}
 
+	// Elastic IP for the NAT Gateway
+	eip, err := awsec2.NewEip(ctx, clusterName+"-nat-eip", &awsec2.EipArgs{
+		Domain: pulumi.String("vpc"),
+		Tags:   pulumi.StringMap{"Name": pulumi.String(clusterName + "-nat-eip")},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("nat eip: %w", err)
+	}
+
 	var privateSubnets, publicSubnets []pulumi.StringOutput
 
 	for i := 0; i < 2; i++ {
@@ -98,6 +107,41 @@ func createVPC(ctx *pulumi.Context, clusterName string, region string) (*vpcOutp
 			RouteTableId: pubRT.ID(),
 		}); err != nil {
 			return nil, fmt.Errorf("route table association %d: %w", i, err)
+		}
+	}
+
+	// NAT Gateway in first public subnet so private nodes can reach the internet
+	natGW, err := awsec2.NewNatGateway(ctx, clusterName+"-nat", &awsec2.NatGatewayArgs{
+		SubnetId:     publicSubnets[0],
+		AllocationId: eip.ID(),
+		Tags:         pulumi.StringMap{"Name": pulumi.String(clusterName + "-nat")},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("nat gateway: %w", err)
+	}
+
+	// Private route table: default route via NAT Gateway
+	privRT, err := awsec2.NewRouteTable(ctx, clusterName+"-priv-rt", &awsec2.RouteTableArgs{
+		VpcId: vpc.ID(),
+		Routes: awsec2.RouteTableRouteArray{
+			awsec2.RouteTableRouteArgs{
+				CidrBlock:    pulumi.StringPtr("0.0.0.0/0"),
+				NatGatewayId: natGW.ID().ToStringOutput().ToStringPtrOutput(),
+			},
+		},
+		Tags: pulumi.StringMap{"Name": pulumi.String(clusterName + "-priv-rt")},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("private route table: %w", err)
+	}
+
+	// Associate private subnets with private route table
+	for i, privSubnet := range privateSubnets {
+		if _, err = awsec2.NewRouteTableAssociation(ctx, fmt.Sprintf("%s-priv-rta-%d", clusterName, i), &awsec2.RouteTableAssociationArgs{
+			SubnetId:     privSubnet,
+			RouteTableId: privRT.ID(),
+		}); err != nil {
+			return nil, fmt.Errorf("private route table association %d: %w", i, err)
 		}
 	}
 

@@ -114,7 +114,9 @@ func NewCluster(ctx *pulumi.Context, cfg *config.Config) (*ClusterOutputs, error
 		Version: pulumi.String(eksVersion(cfg.K8sVersion)),
 		RoleArn: clusterRole.Arn,
 		VpcConfig: awseks.ClusterVpcConfigArgs{
-			SubnetIds: allSubnets,
+			SubnetIds:             allSubnets,
+			EndpointPrivateAccess: pulumi.Bool(true),
+			EndpointPublicAccess:  pulumi.Bool(true),
 		},
 	})
 	if err != nil {
@@ -129,6 +131,7 @@ func NewCluster(ctx *pulumi.Context, cfg *config.Config) (*ClusterOutputs, error
 				Ebs: awsec2.LaunchTemplateBlockDeviceMappingEbsArgs{
 					VolumeSize: pulumi.Int(50),
 					VolumeType: pulumi.String("gp3"),
+					Encrypted:  pulumi.StringPtr("true"),
 				},
 			},
 		},
@@ -184,7 +187,7 @@ func NewCluster(ctx *pulumi.Context, cfg *config.Config) (*ClusterOutputs, error
 	}
 	ctx.Export("cluster_name", out.ClusterName)
 	ctx.Export("cluster_endpoint", out.ClusterEndpoint)
-	ctx.Export("kubeconfig", out.Kubeconfig)
+	ctx.Export("kubeconfig", pulumi.ToSecret(out.Kubeconfig))
 	ctx.Export("node_role_arn", out.NodeRoleARN)
 	return out, nil
 }
