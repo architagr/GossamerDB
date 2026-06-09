@@ -23,8 +23,11 @@ import (
 // buildNodes returns a KIND node list consisting of one control-plane node
 // followed by nodeCount worker nodes. Callers pass 0 to get a single-node
 // cluster (control-plane only). The returned slice is always non-nil and has
-// length 1+nodeCount.
+// length 1+nodeCount. Negative nodeCount is clamped to 0.
 func buildNodes(nodeCount int) []kindv1a4.Node {
+	if nodeCount < 0 {
+		nodeCount = 0
+	}
 	nodes := make([]kindv1a4.Node, 0, 1+nodeCount)
 	nodes = append(nodes, kindv1a4.Node{Role: kindv1a4.ControlPlaneRole})
 	for i := 0; i < nodeCount; i++ {
@@ -82,6 +85,10 @@ func alreadyExists(provider *kindcluster.Provider, name string) (bool, error) {
 // isolated from the user's default ~/.kube/config, preventing accidental
 // context pollution across clusters.
 func createKindCluster(name string, nodeCount int, k8sVersion string) (string, error) {
+	if strings.ContainsAny(name, `/\`) {
+		return "", fmt.Errorf("cluster name %q must not contain path separators", name)
+	}
+
 	provider := kindcluster.NewProvider()
 
 	exists, err := alreadyExists(provider, name)

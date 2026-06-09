@@ -3,6 +3,7 @@ package local
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -31,6 +32,16 @@ func TestBuildNodes_withWorkers(t *testing.T) {
 		if n.Role != kindv1a4.WorkerRole {
 			t.Errorf("node[%d].Role = %q, want WorkerRole", i+1, n.Role)
 		}
+	}
+}
+
+func TestBuildNodes_negative(t *testing.T) {
+	nodes := buildNodes(-1)
+	if len(nodes) != 1 {
+		t.Fatalf("want 1 node for negative count, got %d", len(nodes))
+	}
+	if nodes[0].Role != kindv1a4.ControlPlaneRole {
+		t.Errorf("node[0].Role = %q, want ControlPlaneRole", nodes[0].Role)
 	}
 }
 
@@ -69,7 +80,9 @@ func TestNewCluster(t *testing.T) {
 	name := "gossamerdb-test-ci"
 	t.Cleanup(func() {
 		_ = exec.Command("kind", "delete", "cluster", "--name", name).Run()
-		_ = os.Remove(strings.Join([]string{os.Getenv("HOME"), ".kube", "gossamerdb-" + name + ".yaml"}, "/"))
+		if homeDir, err := os.UserHomeDir(); err == nil {
+			_ = os.Remove(filepath.Join(homeDir, ".kube", "gossamerdb-"+name+".yaml"))
+		}
 	})
 
 	kubeconfigPath, err := createKindCluster(name, 0, "1.29")
@@ -85,7 +98,15 @@ func TestNewCluster(t *testing.T) {
 		t.Errorf("kubeconfig at %s does not mention cluster name %q", kubeconfigPath, name)
 	}
 
-	if _, err := createKindCluster(name, 0, "1.29"); err != nil {
+	kubeconfigPath2, err := createKindCluster(name, 0, "1.29")
+	if err != nil {
 		t.Fatalf("second createKindCluster (idempotency): %v", err)
+	}
+	data2, err := os.ReadFile(kubeconfigPath2)
+	if err != nil {
+		t.Fatalf("kubeconfig missing after idempotent call: %v", err)
+	}
+	if !strings.Contains(string(data2), name) {
+		t.Errorf("kubeconfig after idempotent call does not mention %q", name)
 	}
 }
