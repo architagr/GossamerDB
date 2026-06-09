@@ -1,4 +1,4 @@
-.PHONY: build build-coordinator build-datanode run run-coordinator run-datanode clean
+.PHONY: build build-coordinator build-datanode run run-coordinator run-datanode clean infra-up infra-down infra-preview
 
 build:
 	@echo "Building the project..."
@@ -29,3 +29,15 @@ run-datanode:
 
 clean:
 	rm -rf ./build
+
+# IaC targets — requires Pulumi CLI and ENV=<local|k8s|aws>
+.PHONY: infra-up infra-down infra-preview
+
+infra-up:
+	@cd infra && pulumi up --stack=$(ENV) --yes
+
+infra-down:
+	@cd infra && pulumi destroy --stack=$(ENV) --yes
+
+infra-preview:
+	@cd infra && pulumi preview --stack=$(ENV)
