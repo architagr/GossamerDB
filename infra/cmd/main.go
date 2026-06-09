@@ -9,6 +9,7 @@ import (
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"gossamerdb/infra/pkg/config"
+	"gossamerdb/infra/pkg/local"
 )
 
 func main() {
@@ -38,9 +39,9 @@ func deploy(ctx *pulumi.Context) error {
 	}
 }
 
-// deployLocal is the stub for INFRA-2 (kind cluster provisioner).
+// deployLocal provisions a kind cluster for local development via INFRA-2.
 func deployLocal(ctx *pulumi.Context, cfg config.Config) error {
-	return ctx.Log.Info(fmt.Sprintf("local stack: cluster=%s k8s=%s", cfg.ClusterName, cfg.K8sVersion), nil)
+	return local.NewCluster(ctx, &cfg)
 }
 
 // deployK8s is the stub for INFRA-4 (RBAC baseline).

@@ -2,5 +2,5 @@ config:
   gossamerdb-infra:env: local
   gossamerdb-infra:clusterName: gossamerdb-local
   gossamerdb-infra:k8sVersion: "1.29"
-  gossamerdb-infra:nodeCount: 1
+  gossamerdb-infra:nodeCount: 3
   gossamerdb-infra:namespace: gossamerdb
