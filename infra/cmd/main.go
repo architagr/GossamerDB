@@ -40,18 +40,15 @@ func deploy(ctx *pulumi.Context) error {
 
 // deployLocal is the stub for INFRA-2 (kind cluster provisioner).
 func deployLocal(ctx *pulumi.Context, cfg config.Config) error {
-	ctx.Log.Info(fmt.Sprintf("local stack: cluster=%s k8s=%s", cfg.ClusterName, cfg.K8sVersion), nil)
-	return nil
+	return ctx.Log.Info(fmt.Sprintf("local stack: cluster=%s k8s=%s", cfg.ClusterName, cfg.K8sVersion), nil)
 }
 
 // deployK8s is the stub for INFRA-4 (RBAC baseline).
 func deployK8s(ctx *pulumi.Context, cfg config.Config) error {
-	ctx.Log.Info(fmt.Sprintf("k8s stack: cluster=%s namespace=%s", cfg.ClusterName, cfg.Namespace), nil)
-	return nil
+	return ctx.Log.Info(fmt.Sprintf("k8s stack: cluster=%s namespace=%s", cfg.ClusterName, cfg.Namespace), nil)
 }
 
 // deployAWS is the stub for INFRA-3 (EKS provisioner).
 func deployAWS(ctx *pulumi.Context, cfg config.Config) error {
-	ctx.Log.Info(fmt.Sprintf("aws stack: region=%s cluster=%s", cfg.AWSRegion, cfg.ClusterName), nil)
-	return nil
+	return ctx.Log.Info(fmt.Sprintf("aws stack: region=%s cluster=%s", cfg.AWSRegion, cfg.ClusterName), nil)
 }
