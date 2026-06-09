@@ -1,0 +1,7 @@
+config:
+  gossamerdb-infra:env: aws
+  gossamerdb-infra:clusterName: gossamerdb-prod
+  gossamerdb-infra:k8sVersion: "1.29"
+  gossamerdb-infra:nodeCount: 3
+  gossamerdb-infra:awsRegion: us-east-1
+  gossamerdb-infra:namespace: gossamerdb
