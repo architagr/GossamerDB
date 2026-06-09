@@ -70,7 +70,7 @@ func NewCluster(ctx *pulumi.Context, cfg *config.Config) (*ClusterOutputs, error
 		return nil, nil
 	}
 
-	vpc, err := createVPC(ctx, cfg.ClusterName)
+	vpc, err := createVPC(ctx, cfg.ClusterName, cfg.AWSRegion)
 	if err != nil {
 		return nil, fmt.Errorf("vpc: %w", err)
 	}

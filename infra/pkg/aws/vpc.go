@@ -24,7 +24,7 @@ func subnetCIDR(isPublic bool, index int) string {
 	return fmt.Sprintf("10.0.%d.0/24", third)
 }
 
-func createVPC(ctx *pulumi.Context, clusterName string) (*vpcOutputs, error) {
+func createVPC(ctx *pulumi.Context, clusterName string, region string) (*vpcOutputs, error) {
 	vpc, err := awsec2.NewVpc(ctx, clusterName+"-vpc", &awsec2.VpcArgs{
 		CidrBlock:          pulumi.String("10.0.0.0/16"),
 		EnableDnsHostnames: pulumi.Bool(true),
@@ -60,9 +60,12 @@ func createVPC(ctx *pulumi.Context, clusterName string) (*vpcOutputs, error) {
 	var privateSubnets, publicSubnets []pulumi.StringOutput
 
 	for i := 0; i < 2; i++ {
+		az := fmt.Sprintf("%s%c", region, rune('a'+i))
+
 		priv, err := awsec2.NewSubnet(ctx, fmt.Sprintf("%s-priv-%d", clusterName, i), &awsec2.SubnetArgs{
-			VpcId:     vpc.ID(),
-			CidrBlock: pulumi.String(subnetCIDR(false, i)),
+			VpcId:            vpc.ID(),
+			CidrBlock:        pulumi.String(subnetCIDR(false, i)),
+			AvailabilityZone: pulumi.String(az),
 			Tags: pulumi.StringMap{
 				"Name":                                  pulumi.String(fmt.Sprintf("%s-priv-%d", clusterName, i)),
 				"kubernetes.io/role/internal-elb":       pulumi.String("1"),
@@ -77,6 +80,7 @@ func createVPC(ctx *pulumi.Context, clusterName string) (*vpcOutputs, error) {
 		pub, err := awsec2.NewSubnet(ctx, fmt.Sprintf("%s-pub-%d", clusterName, i), &awsec2.SubnetArgs{
 			VpcId:               vpc.ID(),
 			CidrBlock:           pulumi.String(subnetCIDR(true, i)),
+			AvailabilityZone:    pulumi.String(az),
 			MapPublicIpOnLaunch: pulumi.Bool(true),
 			Tags: pulumi.StringMap{
 				"Name":                                  pulumi.String(fmt.Sprintf("%s-pub-%d", clusterName, i)),
