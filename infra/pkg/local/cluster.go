@@ -13,8 +13,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	kindv1a4 "sigs.k8s.io/kind/pkg/apis/config/v1alpha4"
 	kindcluster "sigs.k8s.io/kind/pkg/cluster"
+
+	"gossamerdb/infra/pkg/config"
 )
 
 // buildNodes returns a KIND node list consisting of one control-plane node
@@ -118,4 +121,41 @@ func createKindCluster(name string, nodeCount int, k8sVersion string) (string, e
 	}
 
 	return kubeconfigPath, nil
+}
+
+// KindCluster is a Pulumi ComponentResource representing a local kind cluster.
+// It gives the cluster a URN in the Pulumi state file for tracking.
+type KindCluster struct {
+	pulumi.ResourceState
+
+	ClusterName    pulumi.StringOutput
+	KubeconfigPath pulumi.StringOutput
+}
+
+// NewCluster creates a local kind cluster as a Pulumi ComponentResource and
+// exports cluster_name and kubeconfig_path as stack outputs.
+func NewCluster(ctx *pulumi.Context, cfg *config.Config) error {
+	c := &KindCluster{}
+	if err := ctx.RegisterComponentResource("gossamerdb:infra:KindCluster", cfg.ClusterName, c); err != nil {
+		return fmt.Errorf("register component: %w", err)
+	}
+
+	kubeconfigPath, err := createKindCluster(cfg.ClusterName, cfg.NodeCount, cfg.K8sVersion)
+	if err != nil {
+		return fmt.Errorf("create cluster: %w", err)
+	}
+
+	c.ClusterName = pulumi.String(cfg.ClusterName).ToStringOutput()
+	c.KubeconfigPath = pulumi.String(kubeconfigPath).ToStringOutput()
+
+	if err := ctx.RegisterResourceOutputs(c, pulumi.Map{
+		"cluster_name":    pulumi.String(cfg.ClusterName),
+		"kubeconfig_path": pulumi.String(kubeconfigPath),
+	}); err != nil {
+		return fmt.Errorf("register outputs: %w", err)
+	}
+
+	ctx.Export("cluster_name", c.ClusterName)
+	ctx.Export("kubeconfig_path", c.KubeconfigPath)
+	return nil
 }
