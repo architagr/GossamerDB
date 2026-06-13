@@ -51,6 +51,24 @@ func TestValidate_awsRequiresRegion(t *testing.T) {
 	}
 }
 
+func TestValidate_namespaceValid(t *testing.T) {
+	for _, ns := range []string{"gossamerdb", "my-ns", "a1", "my-namespace-123"} {
+		c := config.Config{Env: config.EnvLocal, ClusterName: "test", Namespace: ns}
+		if err := c.Validate(); err != nil {
+			t.Errorf("namespace %q: unexpected error: %v", ns, err)
+		}
+	}
+}
+
+func TestValidate_namespaceInvalid(t *testing.T) {
+	for _, ns := range []string{"MyNS", "my_ns", "-bad", "bad-", "has space", "has/slash"} {
+		c := config.Config{Env: config.EnvLocal, ClusterName: "test", Namespace: ns}
+		if err := c.Validate(); err == nil {
+			t.Errorf("namespace %q: expected error, got nil", ns)
+		}
+	}
+}
+
 func TestApplyDefaults(t *testing.T) {
 	cases := []struct {
 		name  string

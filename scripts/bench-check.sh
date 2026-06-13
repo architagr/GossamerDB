@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Performance gate for the sub-5ms SLO.
+# Performance gate for the < 1 ms p99 SLO (NFR-PERF-1).
 # - Runs all package benchmarks.
-# - Fails if any benchmark mean exceeds the latency budget (default 5,000,000 ns/op = 5 ms).
+# - Fails if any benchmark mean exceeds the latency budget (default 1,000,000 ns/op = 1 ms).
 # - Fails on a statistically significant regression vs ./bench-baseline.txt (requires `benchstat`).
 #
 # Usage:
@@ -9,12 +9,12 @@
 #   ./scripts/bench-check.sh --update-baseline  # accept current numbers as the new baseline (Project Lead only)
 #
 # Env:
-#   BENCH_THRESHOLD_NS   override the per-benchmark hard ceiling (ns/op). Default 5000000.
+#   BENCH_THRESHOLD_NS   override the per-benchmark hard ceiling (ns/op). Default 1000000.
 #   BENCH_PACKAGES       override the package selector. Default './...'.
 
 set -euo pipefail
 
-THRESHOLD_NS="${BENCH_THRESHOLD_NS:-5000000}"
+THRESHOLD_NS="${BENCH_THRESHOLD_NS:-1000000}"
 PACKAGES="${BENCH_PACKAGES:-./...}"
 BASELINE_FILE="bench-baseline.txt"
 NEW_FILE="$(mktemp -t bench-new.XXXXXX)"
@@ -40,6 +40,12 @@ fi
 
 echo "bench-check: running benchmarks (threshold ${THRESHOLD_NS} ns/op = $((THRESHOLD_NS/1000000)) ms)"
 go test -bench=. -benchmem -count=10 -run='^$' "$PACKAGES" | tee "$NEW_FILE"
+
+# No benchmarks found → skip gate (graceful on infra-only changes).
+if ! grep -q '^Benchmark' "$NEW_FILE"; then
+  echo "bench-check: no benchmark functions found — skipping gate"
+  exit 0
+fi
 
 # Latency hard ceiling check.
 violations="$(awk -v thr="$THRESHOLD_NS" '

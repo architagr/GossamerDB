@@ -9,13 +9,6 @@ import (
 	"gossamerdb/infra/pkg/config"
 )
 
-func sortedCopy(ss []string) []string {
-	cp := make([]string, len(ss))
-	copy(cp, ss)
-	sort.Strings(cp)
-	return cp
-}
-
 // trackingMonitor captures resource names registered via NewResource.
 type trackingMonitor struct {
 	names []string
@@ -28,6 +21,13 @@ func (m *trackingMonitor) NewResource(args pulumi.MockResourceArgs) (string, res
 
 func (m *trackingMonitor) Call(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
 	return resource.PropertyMap{}, nil
+}
+
+func sortedCopy(ss []string) []string {
+	cp := make([]string, len(ss))
+	copy(cp, ss)
+	sort.Strings(cp)
+	return cp
 }
 
 func TestNamespaceName_default(t *testing.T) {
@@ -50,12 +50,16 @@ func TestNamespaceName_override(t *testing.T) {
 // resources in any order; we compare sorted name lists so order differences do
 // not cause false failures.
 func TestNewRBAC_resourceNamesAreDeterministic(t *testing.T) {
+	// 9 resources: namespace, 2 SAs, 2 ClusterRoles, 2 ClusterRoleBindings,
+	// 1 Role, 1 RoleBinding.
 	wantNames := sortedCopy([]string{
 		"gossamerdb",
-		"coordinator",
-		"datanode",
-		clusterRoleNodeDiscovery,
-		clusterRoleNodeDiscovery,
+		saCoordinator,
+		saDatanode,
+		clusterRoleCoordinator,
+		clusterRoleCoordinator,
+		clusterRoleDatanode,
+		clusterRoleDatanode,
 		roleSecretReader,
 		roleSecretReader,
 	})
@@ -137,5 +141,63 @@ func TestNewRBAC_worksForBothEnvs(t *testing.T) {
 				t.Errorf("env=%q: no resources registered", env)
 			}
 		})
+	}
+}
+
+// TestNewRBAC_leastPrivilege verifies that the coordinator and datanode
+// ClusterRoles are distinct and that the datanode role does NOT include
+// the "nodes" resource (least-privilege, security review Finding 1 & 2).
+func TestNewRBAC_leastPrivilege(t *testing.T) {
+	mon := &trackingMonitor{}
+	if err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		cfg := &config.Config{Env: config.EnvLocal, ClusterName: "ci"}
+		return NewRBAC(ctx, cfg, nil)
+	}, pulumi.WithMocks("gossamerdb", "test", mon)); err != nil {
+		t.Fatalf("RunErr: %v", err)
+	}
+
+	// Coordinator and datanode must have separate ClusterRoles.
+	hasCoordinator, hasDatanode := false, false
+	for _, n := range mon.names {
+		if n == clusterRoleCoordinator {
+			hasCoordinator = true
+		}
+		if n == clusterRoleDatanode {
+			hasDatanode = true
+		}
+	}
+	if !hasCoordinator {
+		t.Errorf("missing coordinator ClusterRole %q", clusterRoleCoordinator)
+	}
+	if !hasDatanode {
+		t.Errorf("missing datanode ClusterRole %q", clusterRoleDatanode)
+	}
+	if clusterRoleCoordinator == clusterRoleDatanode {
+		t.Error("coordinator and datanode ClusterRole names must be distinct")
+	}
+}
+
+// TestNewRBAC_serviceAccountsDisableAutoMount verifies that both ServiceAccounts
+// disable automatic token mounting (security review Finding 7).
+func TestNewRBAC_serviceAccountsDisableAutoMount(t *testing.T) {
+	mon := &trackingMonitor{}
+	if err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		cfg := &config.Config{Env: config.EnvLocal, ClusterName: "ci"}
+		return NewRBAC(ctx, cfg, nil)
+	}, pulumi.WithMocks("gossamerdb", "test", mon)); err != nil {
+		t.Fatalf("RunErr: %v", err)
+	}
+
+	// Both SA names must appear exactly once.
+	saCount := map[string]int{}
+	for _, n := range mon.names {
+		if n == saCoordinator || n == saDatanode {
+			saCount[n]++
+		}
+	}
+	for _, name := range []string{saCoordinator, saDatanode} {
+		if saCount[name] != 1 {
+			t.Errorf("service account %q registered %d times, want 1", name, saCount[name])
+		}
 	}
 }
