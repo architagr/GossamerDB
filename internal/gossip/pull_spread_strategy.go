@@ -18,7 +18,7 @@ func (p *PullSpreadStrategy) Spread(_ model.GossipMessage, peers []string) {
 				return
 			}
 			body, _ := io.ReadAll(resp.Body)
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			log.Printf("[PULL] Gossip pulled from %s → %s", url, string(body))
 		}(peer)
 	}
