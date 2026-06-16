@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"sort"
+	"sync"
 	"testing"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
@@ -10,12 +11,17 @@ import (
 )
 
 // trackingMonitor captures resource names registered via NewResource.
+// Pulumi calls NewResource from concurrent goroutines, so access to names
+// is guarded by a mutex.
 type trackingMonitor struct {
+	mu    sync.Mutex
 	names []string
 }
 
 func (m *trackingMonitor) NewResource(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+	m.mu.Lock()
 	m.names = append(m.names, args.Name)
+	m.mu.Unlock()
 	return args.Name + "_id", args.Inputs, nil
 }
 
