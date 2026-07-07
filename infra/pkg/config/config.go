@@ -43,6 +43,12 @@ type Config struct {
 	// Namespace is the Kubernetes namespace for GossamerDB workloads.
 	// Defaults to the stack default when empty.
 	Namespace string
+	// CoordinatorImage is the container image for the coordinator StatefulSet.
+	// Required by NewCoordinator; no default.
+	CoordinatorImage string
+	// CoordinatorStorageClass is the storageClassName for the Raft PVC.
+	// Defaults to "gp3" on AWS, "standard" on local/k8s (set by ApplyDefaults).
+	CoordinatorStorageClass string
 }
 
 // Validate returns a non-nil error if c is missing required fields, specifies
