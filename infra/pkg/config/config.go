@@ -4,7 +4,13 @@
 // Pulumi stack. It does not perform I/O or read from environment variables.
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"regexp"
+)
+
+// namespaceRE matches valid Kubernetes namespace names (RFC 1123 DNS label).
+var namespaceRE = regexp.MustCompile(`^[a-z0-9][a-z0-9\-]{0,251}[a-z0-9]$`)
 
 // Env identifies the target deployment environment.
 type Env string
@@ -45,6 +51,9 @@ type Config struct {
 func (c Config) Validate() error {
 	if c.ClusterName == "" {
 		return fmt.Errorf("clusterName must not be empty")
+	}
+	if c.Namespace != "" && !namespaceRE.MatchString(c.Namespace) {
+		return fmt.Errorf("namespace %q is not a valid RFC 1123 DNS label", c.Namespace)
 	}
 	switch c.Env {
 	case EnvLocal, EnvK8s:
