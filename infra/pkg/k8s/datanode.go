@@ -82,7 +82,8 @@ func NewDataNode(ctx *pulumi.Context, cfg *config.Config, provider *kubernetes.P
 					Labels: podLabels,
 				},
 				Spec: &corev1.PodSpecArgs{
-					ServiceAccountName: pulumi.String(saDatanode),
+					ServiceAccountName:           pulumi.String(saDatanode),
+					AutomountServiceAccountToken: pulumi.BoolPtr(false),
 					Containers: corev1.ContainerArray{
 						corev1.ContainerArgs{
 							Name:  pulumi.String("datanode"),
