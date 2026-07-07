@@ -20,7 +20,8 @@ func Load(ctx *pulumi.Context) (Config, error) {
 		K8sVersion:  cfg.Get("k8sVersion"),
 		NodeCount:   cfg.GetInt("nodeCount"),
 		AWSRegion:   cfg.Get("awsRegion"),
-		Namespace:   cfg.Get("namespace"),
+		Namespace:     cfg.Get("namespace"),
+		DataNodeImage: cfg.Get("dataNodeImage"),
 	}
 
 	c = ApplyDefaults(c)

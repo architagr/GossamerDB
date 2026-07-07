@@ -43,6 +43,10 @@ type Config struct {
 	// Namespace is the Kubernetes namespace for GossamerDB workloads.
 	// Defaults to the stack default when empty.
 	Namespace string
+	// DataNodeImage is the container image for data-node pods (e.g.
+	// "ghcr.io/architagr/gossamerdb-datanode:v1.0.0"). Required by NewDataNode;
+	// no default — the caller must supply an explicit digest or tag.
+	DataNodeImage string
 }
 
 // Validate returns a non-nil error if c is missing required fields, specifies

@@ -46,11 +46,12 @@ func deployLocal(ctx *pulumi.Context, cfg config.Config) error {
 	return local.NewCluster(ctx, &cfg)
 }
 
-// deployK8s provisions the RBAC baseline (INFRA-4). No cloud provider is
-// wired here; the caller is expected to supply a kubeconfig via KUBECONFIG
-// or Pulumi stack config and let Pulumi's default provider pick it up.
+// deployK8s provisions RBAC (INFRA-4) then the DataNode StatefulSet (INFRA-5).
 func deployK8s(ctx *pulumi.Context, cfg config.Config) error {
-	return k8s.NewRBAC(ctx, &cfg, nil)
+	if err := k8s.NewRBAC(ctx, &cfg, nil); err != nil {
+		return err
+	}
+	return k8s.NewDataNode(ctx, &cfg, nil)
 }
 
 // deployAWS provisions an EKS cluster on AWS via INFRA-3.

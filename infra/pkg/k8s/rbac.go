@@ -26,27 +26,8 @@ const (
 	clusterRoleDatanode = "gossamerdb:datanode-discovery"
 	// roleSecretReader grants namespace-scoped read on secrets (PKI source, HLD §5.7).
 	roleSecretReader = "gossamerdb:secret-reader"
-	saCoordinator    = "coordinator"
-	saDatanode       = "datanode"
+	// saCoordinator and saDatanode are defined in k8s.go (shared helpers).
 )
-
-// namespaceName returns cfg.Namespace when set; otherwise "gossamerdb".
-func namespaceName(cfg *config.Config) string {
-	if cfg.Namespace != "" {
-		return cfg.Namespace
-	}
-	return "gossamerdb"
-}
-
-// resOpts builds a ResourceOption slice with the provider (when non-nil) plus
-// any extra options. A new slice is allocated each call to prevent aliasing.
-func resOpts(provider *kubernetes.Provider, extra ...pulumi.ResourceOption) []pulumi.ResourceOption {
-	var out []pulumi.ResourceOption
-	if provider != nil {
-		out = append(out, pulumi.Provider(provider))
-	}
-	return append(out, extra...)
-}
 
 // NewRBAC creates the GossamerDB namespace, service accounts, and RBAC
 // bindings required by coordinator and data-node workloads. All resources are
