@@ -42,6 +42,7 @@ jobs:
   infra-build-and-test:
     name: Infra Lint, Test, and Build
     runs-on: ubuntu-latest
+    if: hashFiles('infra/go.mod') != ''
     defaults:
       run:
         working-directory: infra
