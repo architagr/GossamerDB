@@ -43,10 +43,18 @@ type Config struct {
 	// Namespace is the Kubernetes namespace for GossamerDB workloads.
 	// Defaults to the stack default when empty.
 	Namespace string
-	// DataNodeImage is the container image for data-node pods (e.g.
-	// "ghcr.io/architagr/gossamerdb-datanode:v1.0.0"). Required by NewDataNode;
-	// no default — the caller must supply an explicit digest or tag.
+	// DataNodeImage is the container image for data-node pods.
+	// Required by NewDataNode; no default.
 	DataNodeImage string
+	// CoordinatorImage is the container image for the coordinator StatefulSet.
+	// Required by NewCoordinator; no default.
+	CoordinatorImage string
+	// CoordinatorStorageClass is the storageClassName for the Raft PVC.
+	// Defaults to "gp3" on AWS, "standard" on local/k8s (set by ApplyDefaults).
+	CoordinatorStorageClass string
+	// CoordinatorReplicas is the number of coordinator pods. Must be odd and >= 3.
+	// Defaults to 3 (set by ApplyDefaults). Valid values: 3, 5, 7, …
+	CoordinatorReplicas int
 }
 
 // Validate returns a non-nil error if c is missing required fields, specifies
@@ -58,6 +66,12 @@ func (c Config) Validate() error {
 	}
 	if c.Namespace != "" && !namespaceRE.MatchString(c.Namespace) {
 		return fmt.Errorf("namespace %q is not a valid RFC 1123 DNS label", c.Namespace)
+	}
+	if c.CoordinatorReplicas < 3 {
+		return fmt.Errorf("coordinatorReplicas must be >= 3, got %d", c.CoordinatorReplicas)
+	}
+	if c.CoordinatorReplicas%2 == 0 {
+		return fmt.Errorf("coordinatorReplicas must be odd for Raft quorum, got %d", c.CoordinatorReplicas)
 	}
 	switch c.Env {
 	case EnvLocal, EnvK8s:

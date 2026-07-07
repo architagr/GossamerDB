@@ -20,8 +20,11 @@ func Load(ctx *pulumi.Context) (Config, error) {
 		K8sVersion:  cfg.Get("k8sVersion"),
 		NodeCount:   cfg.GetInt("nodeCount"),
 		AWSRegion:   cfg.Get("awsRegion"),
-		Namespace:     cfg.Get("namespace"),
-		DataNodeImage: cfg.Get("dataNodeImage"),
+		Namespace:               cfg.Get("namespace"),
+		DataNodeImage:           cfg.Get("dataNodeImage"),
+		CoordinatorImage:        cfg.Get("coordinatorImage"),
+		CoordinatorStorageClass: cfg.Get("coordinatorStorageClass"),
+		CoordinatorReplicas:     cfg.GetInt("coordinatorReplicas"),
 	}
 
 	c = ApplyDefaults(c)
@@ -41,6 +44,16 @@ func ApplyDefaults(c Config) Config {
 	}
 	if c.Namespace == "" {
 		c.Namespace = "gossamerdb"
+	}
+	if c.CoordinatorStorageClass == "" {
+		if c.Env == EnvAWS {
+			c.CoordinatorStorageClass = "gp3"
+		} else {
+			c.CoordinatorStorageClass = "standard"
+		}
+	}
+	if c.CoordinatorReplicas == 0 {
+		c.CoordinatorReplicas = 3
 	}
 	return c
 }
