@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"sync"
 
 	"GossamerDB/internal/security"
 	"GossamerDB/pkg/model"
@@ -13,10 +12,9 @@ import (
 )
 
 type Server struct {
-	router       *gin.Engine
-	srv          *http.Server
-	engine       *Engine
-	nodeHealthMu sync.RWMutex
+	router *gin.Engine
+	srv    *http.Server
+	engine *Engine
 }
 
 func NewServer(listenAddress string, engine *Engine) *Server {

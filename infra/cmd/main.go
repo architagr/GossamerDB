@@ -46,9 +46,11 @@ func deployLocal(ctx *pulumi.Context, cfg config.Config) error {
 	return local.NewCluster(ctx, &cfg)
 }
 
-// deployK8s provisions the DataNode StatefulSet baseline (INFRA-5).
-// RBAC (INFRA-4) is wired separately via a dedicated provider once available.
+// deployK8s provisions RBAC (INFRA-4) then the DataNode StatefulSet (INFRA-5).
 func deployK8s(ctx *pulumi.Context, cfg config.Config) error {
+	if err := k8s.NewRBAC(ctx, &cfg, nil); err != nil {
+		return err
+	}
 	return k8s.NewDataNode(ctx, &cfg, nil)
 }
 
