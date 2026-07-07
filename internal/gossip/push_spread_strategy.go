@@ -25,7 +25,9 @@ func (p *PushSpreadStrategy) Spread(msg model.GossipMessage, peers []string) {
 				log.Printf("[ERROR] Failed sending gossip to %s: %v", url, err)
 				return
 			}
-			resp.Body.Close()
+			if err := resp.Body.Close(); err != nil {
+				log.Printf("[WARN] Failed closing body from %s: %v", url, err)
+			}
 			log.Printf("[ACK] Gossip sent to %s", url)
 		}(peer)
 	}

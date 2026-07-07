@@ -18,7 +18,9 @@ func (p *PullSpreadStrategy) Spread(_ model.GossipMessage, peers []string) {
 				return
 			}
 			body, _ := io.ReadAll(resp.Body)
-			resp.Body.Close()
+			if err := resp.Body.Close(); err != nil {
+				log.Printf("[WARN] Failed closing body from %s: %v", url, err)
+			}
 			log.Printf("[PULL] Gossip pulled from %s → %s", url, string(body))
 		}(peer)
 	}
