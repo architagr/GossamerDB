@@ -43,6 +43,9 @@ type Config struct {
 	// Namespace is the Kubernetes namespace for GossamerDB workloads.
 	// Defaults to the stack default when empty.
 	Namespace string
+	// DataNodeImage is the container image for data-node pods.
+	// Required by NewDataNode; no default.
+	DataNodeImage string
 	// CoordinatorImage is the container image for the coordinator StatefulSet.
 	// Required by NewCoordinator; no default.
 	CoordinatorImage string

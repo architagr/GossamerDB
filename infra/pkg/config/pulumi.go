@@ -21,6 +21,7 @@ func Load(ctx *pulumi.Context) (Config, error) {
 		NodeCount:   cfg.GetInt("nodeCount"),
 		AWSRegion:   cfg.Get("awsRegion"),
 		Namespace:               cfg.Get("namespace"),
+		DataNodeImage:           cfg.Get("dataNodeImage"),
 		CoordinatorImage:        cfg.Get("coordinatorImage"),
 		CoordinatorStorageClass: cfg.Get("coordinatorStorageClass"),
 		CoordinatorReplicas:     cfg.GetInt("coordinatorReplicas"),
