@@ -126,12 +126,21 @@ func TestNewServices_k8sUsesClusterIP(t *testing.T) {
 	}
 }
 
-// TestNewServices_awsUsesLoadBalancerWithNLBAnnotations verifies type=LoadBalancer
-// and both NLB annotations are present on AWS env.
+// TestNewServices_awsUsesLoadBalancerWithNLBAnnotations verifies type=LoadBalancer,
+// nlb type annotation, and correct scheme per service:
+//   - client services → internet-facing
+//   - admin service   → internal (admin plane must not be publicly reachable)
 func TestNewServices_awsUsesLoadBalancerWithNLBAnnotations(t *testing.T) {
 	cfg := &config.Config{Env: config.EnvAWS, ClusterName: "ci", AWSRegion: "us-east-1"}
 	mon := runServices(t, cfg)
-	for _, name := range []string{svcClientGRPC, svcClientREST, svcAdminGRPC} {
+
+	wantScheme := map[string]string{
+		svcClientGRPC: "internet-facing",
+		svcClientREST: "internet-facing",
+		svcAdminGRPC:  "internal",
+	}
+
+	for name, wantSch := range wantScheme {
 		e, ok := mon.entryByName(name)
 		if !ok {
 			t.Fatalf("service %q not found", name)
@@ -154,11 +163,34 @@ func TestNewServices_awsUsesLoadBalancerWithNLBAnnotations(t *testing.T) {
 		}
 		annMap := ann.ObjectValue()
 		if v := annMap[resource.PropertyKey(nlbTypeAnnotation)]; !v.IsString() || v.StringValue() != "nlb" {
-			t.Errorf("service %q: annotation %q = %v, want nlb", name, nlbTypeAnnotation, v)
+			t.Errorf("service %q: %q = %v, want nlb", name, nlbTypeAnnotation, v)
 		}
-		if v := annMap[resource.PropertyKey(nlbSchemeAnnotation)]; !v.IsString() || v.StringValue() != "internet-facing" {
-			t.Errorf("service %q: annotation %q = %v, want internet-facing", name, nlbSchemeAnnotation, v)
+		if v := annMap[resource.PropertyKey(nlbSchemeAnnotation)]; !v.IsString() || v.StringValue() != wantSch {
+			t.Errorf("service %q: %q = %v, want %q", name, nlbSchemeAnnotation, v, wantSch)
 		}
+	}
+}
+
+// TestNewServices_awsAdminIsInternalScheme explicitly verifies the admin service
+// uses scheme=internal on AWS (security: admin plane must not be internet-facing).
+func TestNewServices_awsAdminIsInternalScheme(t *testing.T) {
+	cfg := &config.Config{Env: config.EnvAWS, ClusterName: "ci", AWSRegion: "us-east-1"}
+	mon := runServices(t, cfg)
+	e, ok := mon.entryByName(svcAdminGRPC)
+	if !ok {
+		t.Fatalf("service %q not found", svcAdminGRPC)
+	}
+	meta := e.inputs["metadata"]
+	if !meta.IsObject() {
+		t.Fatal("metadata not an object")
+	}
+	ann := meta.ObjectValue()["annotations"]
+	if !ann.IsObject() {
+		t.Fatal("annotations not present")
+	}
+	scheme := ann.ObjectValue()[resource.PropertyKey(nlbSchemeAnnotation)]
+	if !scheme.IsString() || scheme.StringValue() != "internal" {
+		t.Errorf("admin service scheme = %v, want internal", scheme)
 	}
 }
 

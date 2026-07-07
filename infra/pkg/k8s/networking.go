@@ -68,9 +68,14 @@ func newService(
 
 	if cfg.Env == config.EnvAWS {
 		svcType = "LoadBalancer"
+		// Admin plane is internal-only; client-facing services are internet-facing.
+		scheme := "internet-facing"
+		if s.name == svcAdminGRPC {
+			scheme = "internal"
+		}
 		annotations = pulumi.StringMap{
 			nlbTypeAnnotation:   pulumi.String("nlb"),
-			nlbSchemeAnnotation: pulumi.String("internet-facing"),
+			nlbSchemeAnnotation: pulumi.String(scheme),
 		}
 	} else {
 		svcType = "ClusterIP"
