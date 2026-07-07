@@ -10,6 +10,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"gossamerdb/infra/pkg/aws"
 	"gossamerdb/infra/pkg/config"
+	"gossamerdb/infra/pkg/k8s"
 	"gossamerdb/infra/pkg/local"
 )
 
@@ -45,9 +46,10 @@ func deployLocal(ctx *pulumi.Context, cfg config.Config) error {
 	return local.NewCluster(ctx, &cfg)
 }
 
-// deployK8s is the stub for INFRA-4 (RBAC baseline).
+// deployK8s provisions the DataNode StatefulSet baseline (INFRA-5).
+// RBAC (INFRA-4) is wired separately via a dedicated provider once available.
 func deployK8s(ctx *pulumi.Context, cfg config.Config) error {
-	return ctx.Log.Info(fmt.Sprintf("k8s stack: cluster=%s namespace=%s", cfg.ClusterName, cfg.Namespace), nil)
+	return k8s.NewDataNode(ctx, &cfg, nil)
 }
 
 // deployAWS provisions an EKS cluster on AWS via INFRA-3.
