@@ -16,7 +16,7 @@ func TestValidate_knownEnvs(t *testing.T) {
 		{config.EnvAWS, "us-east-1"},
 	}
 	for _, tc := range cases {
-		c := config.Config{Env: tc.env, ClusterName: "test", AWSRegion: tc.region}
+		c := config.Config{Env: tc.env, ClusterName: "test", AWSRegion: tc.region, CoordinatorReplicas: 3}
 		if err := c.Validate(); err != nil {
 			t.Errorf("env %q: unexpected error: %v", tc.env, err)
 		}
@@ -53,7 +53,7 @@ func TestValidate_awsRequiresRegion(t *testing.T) {
 
 func TestValidate_namespaceValid(t *testing.T) {
 	for _, ns := range []string{"gossamerdb", "my-ns", "a1", "my-namespace-123"} {
-		c := config.Config{Env: config.EnvLocal, ClusterName: "test", Namespace: ns}
+		c := config.Config{Env: config.EnvLocal, ClusterName: "test", Namespace: ns, CoordinatorReplicas: 3}
 		if err := c.Validate(); err != nil {
 			t.Errorf("namespace %q: unexpected error: %v", ns, err)
 		}
@@ -66,6 +66,48 @@ func TestValidate_namespaceInvalid(t *testing.T) {
 		if err := c.Validate(); err == nil {
 			t.Errorf("namespace %q: expected error, got nil", ns)
 		}
+	}
+}
+
+func TestValidate_coordinatorReplicas(t *testing.T) {
+	base := config.Config{Env: config.EnvLocal, ClusterName: "test"}
+
+	valid := []int{3, 5, 7, 9}
+	for _, n := range valid {
+		c := base
+		c.CoordinatorReplicas = n
+		if err := c.Validate(); err != nil {
+			t.Errorf("replicas=%d: unexpected error: %v", n, err)
+		}
+	}
+
+	invalid := []struct {
+		n      int
+		reason string
+	}{
+		{0, "zero"},
+		{1, "below minimum"},
+		{2, "even and below minimum"},
+		{4, "even"},
+		{6, "even"},
+	}
+	for _, tc := range invalid {
+		c := base
+		c.CoordinatorReplicas = tc.n
+		if err := c.Validate(); err == nil {
+			t.Errorf("replicas=%d (%s): expected error, got nil", tc.n, tc.reason)
+		}
+	}
+}
+
+func TestApplyDefaults_coordinatorReplicas(t *testing.T) {
+	c := config.ApplyDefaults(config.Config{})
+	if c.CoordinatorReplicas != 3 {
+		t.Errorf("default CoordinatorReplicas = %d, want 3", c.CoordinatorReplicas)
+	}
+	c2 := config.ApplyDefaults(config.Config{CoordinatorReplicas: 5})
+	if c2.CoordinatorReplicas != 5 {
+		t.Errorf("explicit CoordinatorReplicas overwritten: got %d, want 5", c2.CoordinatorReplicas)
 	}
 }
 

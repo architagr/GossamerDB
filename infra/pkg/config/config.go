@@ -49,6 +49,9 @@ type Config struct {
 	// CoordinatorStorageClass is the storageClassName for the Raft PVC.
 	// Defaults to "gp3" on AWS, "standard" on local/k8s (set by ApplyDefaults).
 	CoordinatorStorageClass string
+	// CoordinatorReplicas is the number of coordinator pods. Must be odd and >= 3.
+	// Defaults to 3 (set by ApplyDefaults). Valid values: 3, 5, 7, …
+	CoordinatorReplicas int
 }
 
 // Validate returns a non-nil error if c is missing required fields, specifies
@@ -60,6 +63,12 @@ func (c Config) Validate() error {
 	}
 	if c.Namespace != "" && !namespaceRE.MatchString(c.Namespace) {
 		return fmt.Errorf("namespace %q is not a valid RFC 1123 DNS label", c.Namespace)
+	}
+	if c.CoordinatorReplicas < 3 {
+		return fmt.Errorf("coordinatorReplicas must be >= 3, got %d", c.CoordinatorReplicas)
+	}
+	if c.CoordinatorReplicas%2 == 0 {
+		return fmt.Errorf("coordinatorReplicas must be odd for Raft quorum, got %d", c.CoordinatorReplicas)
 	}
 	switch c.Env {
 	case EnvLocal, EnvK8s:

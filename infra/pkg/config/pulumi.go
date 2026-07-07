@@ -23,6 +23,7 @@ func Load(ctx *pulumi.Context) (Config, error) {
 		Namespace:               cfg.Get("namespace"),
 		CoordinatorImage:        cfg.Get("coordinatorImage"),
 		CoordinatorStorageClass: cfg.Get("coordinatorStorageClass"),
+		CoordinatorReplicas:     cfg.GetInt("coordinatorReplicas"),
 	}
 
 	c = ApplyDefaults(c)
@@ -49,6 +50,9 @@ func ApplyDefaults(c Config) Config {
 		} else {
 			c.CoordinatorStorageClass = "standard"
 		}
+	}
+	if c.CoordinatorReplicas == 0 {
+		c.CoordinatorReplicas = 3
 	}
 	return c
 }

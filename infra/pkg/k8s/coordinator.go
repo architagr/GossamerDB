@@ -18,20 +18,25 @@ const (
 	coordinatorHeadlessSvcName = "gossamerdb-coordinator-headless"
 	coordinatorPDBName         = "gossamerdb-coordinator"
 	coordinatorContainerPort   = 8080
-	coordinatorReplicas        = 3
-	coordinatorPDBMinAvail     = 2
 	coordinatorPVCSize         = "10Gi"
 	coordinatorPVCMountPath    = "/var/lib/gossamerdb/raft"
 	coordinatorFIOAnnotation   = "gossamerdb.io/fio-floor"
 	coordinatorFIOFloor        = "3000iops"
 )
 
-// NewCoordinator creates the 3-node coordinator StatefulSet with a local-disk
-// PVC for the Raft commit log, the headless Service for peer discovery, and
-// a PodDisruptionBudget tolerating 1-of-3 coordinator failure.
+// coordinatorQuorum returns the minimum available pods required for Raft
+// consensus: floor(n/2)+1. For 3 replicas → 2, for 5 → 3, for 7 → 4.
+func coordinatorQuorum(replicas int) int {
+	return replicas/2 + 1
+}
+
+// NewCoordinator creates the coordinator StatefulSet with a local-disk PVC for
+// the Raft commit log, the headless Service for peer discovery, and a
+// PodDisruptionBudget sized to the quorum of cfg.CoordinatorReplicas.
 //
-// cfg.CoordinatorImage must be non-empty. cfg.CoordinatorStorageClass controls
-// the PVC storage class ("gp3" on AWS, "standard" on local by ApplyDefaults).
+// cfg.CoordinatorImage must be non-empty. cfg.CoordinatorReplicas must be odd
+// and >= 3 (validated by config.Validate before this is called).
+// cfg.CoordinatorStorageClass controls the PVC storage class.
 // provider may be nil under Pulumi's mock test harness.
 func NewCoordinator(ctx *pulumi.Context, cfg *config.Config, provider *kubernetes.Provider) error {
 	if cfg.CoordinatorImage == "" {
@@ -74,7 +79,7 @@ func NewCoordinator(ctx *pulumi.Context, cfg *config.Config, provider *kubernete
 			Labels:    podLabels,
 		},
 		Spec: &appsv1.StatefulSetSpecArgs{
-			Replicas:    pulumi.Int(coordinatorReplicas),
+			Replicas:    pulumi.Int(cfg.CoordinatorReplicas),
 			ServiceName: pulumi.String(coordinatorHeadlessSvcName),
 			// Ordered startup is required for Raft leader election (HLD §5.1 KAD-1).
 			// Do NOT set podManagementPolicy: Parallel.
@@ -161,7 +166,7 @@ func NewCoordinator(ctx *pulumi.Context, cfg *config.Config, provider *kubernete
 			Namespace: pulumi.String(ns),
 		},
 		Spec: &policyv1.PodDisruptionBudgetSpecArgs{
-			MinAvailable: pulumi.Int(coordinatorPDBMinAvail),
+			MinAvailable: pulumi.Int(coordinatorQuorum(cfg.CoordinatorReplicas)),
 			Selector: &metav1.LabelSelectorArgs{
 				MatchLabels: podLabels,
 			},

@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
@@ -58,10 +59,11 @@ func runCoordinator(t *testing.T, cfg *config.Config) *coordinatorMonitor {
 
 func validCoordinatorCfg() *config.Config {
 	return &config.Config{
-		Env:                    config.EnvLocal,
-		ClusterName:            "ci",
-		NodeCount:              3,
-		CoordinatorImage:       "ghcr.io/gossamerdb/coordinator:latest",
+		Env:                     config.EnvLocal,
+		ClusterName:             "ci",
+		NodeCount:               3,
+		CoordinatorReplicas:     3,
+		CoordinatorImage:        "ghcr.io/gossamerdb/coordinator:latest",
 		CoordinatorStorageClass: "standard",
 	}
 }
@@ -105,13 +107,16 @@ func TestNewCoordinator_registersPDB(t *testing.T) {
 	}
 }
 
-// TestNewCoordinator_replicaCountIsAlwaysThree asserts replicas=3 regardless of cfg.NodeCount.
-func TestNewCoordinator_replicaCountIsAlwaysThree(t *testing.T) {
-	for _, nodeCount := range []int{1, 3, 5} {
-		nodeCount := nodeCount
-		t.Run("nodeCount"+string(rune('0'+nodeCount)), func(t *testing.T) {
+// TestNewCoordinator_replicaCountFromConfig asserts StatefulSet replicas matches
+// cfg.CoordinatorReplicas and is independent of cfg.NodeCount.
+// Also verifies valid odd values 3, 5, 7 are all accepted.
+func TestNewCoordinator_replicaCountFromConfig(t *testing.T) {
+	for _, replicas := range []int{3, 5, 7} {
+		replicas := replicas
+		t.Run(fmt.Sprintf("replicas%d", replicas), func(t *testing.T) {
 			cfg := validCoordinatorCfg()
-			cfg.NodeCount = nodeCount
+			cfg.CoordinatorReplicas = replicas
+			cfg.NodeCount = 10 // must NOT affect coordinator replicas
 			mon := runCoordinator(t, cfg)
 			entry, ok := mon.entryByType("kubernetes:apps/v1:StatefulSet")
 			if !ok {
@@ -121,28 +126,41 @@ func TestNewCoordinator_replicaCountIsAlwaysThree(t *testing.T) {
 			if !spec.IsObject() {
 				t.Skip("spec not an object in mock inputs")
 			}
-			replicas := spec.ObjectValue()["replicas"]
-			if !replicas.IsNumber() || int(replicas.NumberValue()) != coordinatorReplicas {
-				t.Errorf("replicas = %v, want %d", replicas, coordinatorReplicas)
+			got := spec.ObjectValue()["replicas"]
+			if !got.IsNumber() || int(got.NumberValue()) != replicas {
+				t.Errorf("replicas = %v, want %d", got, replicas)
 			}
 		})
 	}
 }
 
-// TestNewCoordinator_pdbMinAvailable asserts PDB minAvailable=2.
-func TestNewCoordinator_pdbMinAvailable(t *testing.T) {
-	mon := runCoordinator(t, validCoordinatorCfg())
-	entry, ok := mon.entryByType("kubernetes:policy/v1:PodDisruptionBudget")
-	if !ok {
-		t.Fatal("PDB entry not found")
+// TestNewCoordinator_pdbMinAvailableIsQuorum asserts PDB minAvailable equals
+// floor(n/2)+1 for each valid replica count.
+func TestNewCoordinator_pdbMinAvailableIsQuorum(t *testing.T) {
+	cases := []struct{ replicas, wantMinAvail int }{
+		{3, 2},
+		{5, 3},
+		{7, 4},
 	}
-	spec := entry.inputs["spec"]
-	if !spec.IsObject() {
-		t.Skip("spec not an object in mock inputs")
-	}
-	minAvail := spec.ObjectValue()["minAvailable"]
-	if !minAvail.IsNumber() || int(minAvail.NumberValue()) != coordinatorPDBMinAvail {
-		t.Errorf("minAvailable = %v, want %d", minAvail, coordinatorPDBMinAvail)
+	for _, tc := range cases {
+		tc := tc
+		t.Run(fmt.Sprintf("replicas%d", tc.replicas), func(t *testing.T) {
+			cfg := validCoordinatorCfg()
+			cfg.CoordinatorReplicas = tc.replicas
+			mon := runCoordinator(t, cfg)
+			entry, ok := mon.entryByType("kubernetes:policy/v1:PodDisruptionBudget")
+			if !ok {
+				t.Fatal("PDB entry not found")
+			}
+			spec := entry.inputs["spec"]
+			if !spec.IsObject() {
+				t.Skip("spec not an object in mock inputs")
+			}
+			minAvail := spec.ObjectValue()["minAvailable"]
+			if !minAvail.IsNumber() || int(minAvail.NumberValue()) != tc.wantMinAvail {
+				t.Errorf("replicas=%d: minAvailable = %v, want %d", tc.replicas, minAvail, tc.wantMinAvail)
+			}
+		})
 	}
 }
 
@@ -192,11 +210,12 @@ func TestNewCoordinator_worksForBothEnvs(t *testing.T) {
 		env := env
 		t.Run(string(env), func(t *testing.T) {
 			cfg := &config.Config{
-				Env:                    env,
-				ClusterName:            "ci",
-				NodeCount:              3,
-				AWSRegion:              "us-east-1",
-				CoordinatorImage:       "ghcr.io/gossamerdb/coordinator:latest",
+				Env:                     env,
+				ClusterName:             "ci",
+				NodeCount:               3,
+				AWSRegion:               "us-east-1",
+				CoordinatorReplicas:     3,
+				CoordinatorImage:        "ghcr.io/gossamerdb/coordinator:latest",
 				CoordinatorStorageClass: "gp3",
 			}
 			mon := runCoordinator(t, cfg)
