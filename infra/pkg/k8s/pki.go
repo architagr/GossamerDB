@@ -18,10 +18,9 @@ const (
 	pkiDatanodeTLSSecret    = "gossamerdb-datanode-tls"
 	pkiAdminTLSSecret       = "gossamerdb-admin-tls"
 	pkiClientTLSSecret      = "gossamerdb-client-tls"
-	pkiCertDuration         = "8760h"
-	pkiCertRenewBefore      = "720h"
-	pkiCertManagerNS        = "cert-manager"
-	pkiCertManagerCRD       = "certificates.cert-manager.io"
+	pkiCertDuration    = "8760h"
+	pkiCertRenewBefore = "720h"
+	pkiCertManagerCRD  = "certificates.cert-manager.io"
 )
 
 // certDef describes a single Certificate resource.
@@ -41,11 +40,12 @@ func NewPKI(ctx *pulumi.Context, cfg *config.Config, provider *kubernetes.Provid
 		return fmt.Errorf("config.CASecretName must not be empty: supply the name of the cert-manager CA Secret")
 	}
 
-	if err := checkCertManagerCRDs(ctx, provider); err != nil {
+	crdCheck, err := checkCertManagerCRDs(ctx, provider)
+	if err != nil {
 		return err
 	}
 
-	issuer, err := createClusterIssuer(ctx, cfg, provider)
+	issuer, err := createClusterIssuer(ctx, cfg, provider, crdCheck)
 	if err != nil {
 		return err
 	}
@@ -53,26 +53,30 @@ func NewPKI(ctx *pulumi.Context, cfg *config.Config, provider *kubernetes.Provid
 	return createCertificates(ctx, cfg, provider, issuer)
 }
 
-// checkCertManagerCRDs verifies that the certificates.cert-manager.io CRD is
-// present in the cluster. Returns a descriptive error when it is absent.
-func checkCertManagerCRDs(ctx *pulumi.Context, provider *kubernetes.Provider) error {
-	_, err := apiextv1.GetCustomResourceDefinition(ctx, "cert-manager-crd-check",
+// checkCertManagerCRDs reads the certificates.cert-manager.io CRD from the cluster.
+// Pulumi's ReadResource runs asynchronously; if the CRD is absent the deploy fails
+// with "cert-manager-crd-check" as the failed resource. The returned resource is
+// passed as DependsOn to the ClusterIssuer so downstream resources are blocked.
+// Operator guidance: https://cert-manager.io/docs/installation/
+func checkCertManagerCRDs(ctx *pulumi.Context, provider *kubernetes.Provider) (*apiextv1.CustomResourceDefinition, error) {
+	crd, err := apiextv1.GetCustomResourceDefinition(ctx, "cert-manager-crd-check",
 		pulumi.ID(pkiCertManagerCRD),
 		nil,
 		resOpts(provider)...,
 	)
 	if err != nil {
-		return fmt.Errorf(
+		return nil, fmt.Errorf(
 			"cert-manager CRDs not installed: deploy cert-manager first — https://cert-manager.io/docs/installation/",
 		)
 	}
-	return nil
+	return crd, nil
 }
 
 func createClusterIssuer(
 	ctx *pulumi.Context,
 	cfg *config.Config,
 	provider *kubernetes.Provider,
+	crdCheck *apiextv1.CustomResourceDefinition,
 ) (*apiextensions.CustomResource, error) {
 	return apiextensions.NewCustomResource(ctx, pkiClusterIssuerName, &apiextensions.CustomResourceArgs{
 		ApiVersion: pulumi.String("cert-manager.io/v1"),
@@ -87,7 +91,7 @@ func createClusterIssuer(
 				},
 			},
 		},
-	}, resOpts(provider)...)
+	}, resOpts(provider, pulumi.DependsOn([]pulumi.Resource{crdCheck}))...)
 }
 
 func createCertificates(
