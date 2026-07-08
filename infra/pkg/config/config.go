@@ -55,6 +55,12 @@ type Config struct {
 	// CoordinatorReplicas is the number of coordinator pods. Must be odd and >= 3.
 	// Defaults to 3 (set by ApplyDefaults). Valid values: 3, 5, 7, …
 	CoordinatorReplicas int
+	// CASecretName is the name of the Kubernetes Secret holding the CA key-pair
+	// for the cert-manager ClusterIssuer. Required by NewPKI.
+	CASecretName string
+	// Region is used in datanode certificate SANs (data.<cluster>.<region>).
+	// Defaults to AWSRegion on AWS, "local" on local/k8s (set by ApplyDefaults).
+	Region string
 }
 
 // Validate returns a non-nil error if c is missing required fields, specifies

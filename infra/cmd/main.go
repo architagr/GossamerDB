@@ -46,12 +46,15 @@ func deployLocal(ctx *pulumi.Context, cfg config.Config) error {
 	return local.NewCluster(ctx, &cfg)
 }
 
-// deployK8s provisions RBAC (INFRA-4) then the DataNode StatefulSet (INFRA-5).
+// deployK8s provisions RBAC (INFRA-4), DataNode (INFRA-5), and PKI (INFRA-8).
 func deployK8s(ctx *pulumi.Context, cfg config.Config) error {
 	if err := k8s.NewRBAC(ctx, &cfg, nil); err != nil {
 		return err
 	}
-	return k8s.NewDataNode(ctx, &cfg, nil)
+	if err := k8s.NewDataNode(ctx, &cfg, nil); err != nil {
+		return err
+	}
+	return k8s.NewPKI(ctx, &cfg, nil)
 }
 
 // deployAWS provisions an EKS cluster on AWS via INFRA-3.

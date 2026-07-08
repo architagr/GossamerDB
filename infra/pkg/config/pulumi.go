@@ -25,6 +25,8 @@ func Load(ctx *pulumi.Context) (Config, error) {
 		CoordinatorImage:        cfg.Get("coordinatorImage"),
 		CoordinatorStorageClass: cfg.Get("coordinatorStorageClass"),
 		CoordinatorReplicas:     cfg.GetInt("coordinatorReplicas"),
+		CASecretName:            cfg.Get("caSecretName"),
+		Region:                  cfg.Get("region"),
 	}
 
 	c = ApplyDefaults(c)
@@ -54,6 +56,13 @@ func ApplyDefaults(c Config) Config {
 	}
 	if c.CoordinatorReplicas == 0 {
 		c.CoordinatorReplicas = 3
+	}
+	if c.Region == "" {
+		if c.Env == EnvAWS {
+			c.Region = c.AWSRegion
+		} else {
+			c.Region = "local"
+		}
 	}
 	return c
 }
